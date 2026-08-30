@@ -1,0 +1,53 @@
+name: Build iOS IPA (free Apple ID)
+
+# 触发：手动点「Run workflow」，或推到 main/master 自动跑
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build-ios:
+    runs-on: macos-latest        # GitHub 免费 macOS runner（自带 Xcode）
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      # 把免费 Apple ID 的 team 注入到 Xcode 工程（自动签名需要 team）
+      - name: Inject signing team
+        env:
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          perl -i -pe 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Automatic;\n\t\t\t\tDEVELOPMENT_TEAM = "$ENV{TEAM}";/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' "s/__TEAM_ID__/$TEAM/g" ios/ExportOptions.plist
+
+      # 用免费 Apple ID 登录并自动签名（development）
+      # CC_EMAIL / CC_PASSWORD / CC_TEAM_ID 由 repo Secrets 提供，不进代码
+      - name: Build IPA (development signed)
+        env:
+          CC_EMAIL: ${{ secrets.APPLE_ID }}
+          CC_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          CC_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          export CC_EMAIL="${{ secrets.APPLE_ID }}"
+          export CC_PASSWORD="${{ secrets.APPLE_PASSWORD }}"
+          export CC_TEAM_ID="${{ secrets.APPLE_TEAM_ID }}"
+          flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiejii-ios-free
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error

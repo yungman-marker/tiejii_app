@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# Codemagic Flutter + iOS (free Apple ID) workflow
+#
+# 触发：你点 Codemagic 控制台 "Start new build" → 选 workflow 后手动触发
+# 产物：build/ios/ipa/*.ipa  (已 development 签名) → 下载后用 Sideloadly 装到 iPhone
+# ---------------------------------------------------------------------------
+
+workflows:
+
+  ios-free-id:
+    name: iOS IPA (free Apple ID)
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - app_store_credentials   # 在 Codemagic 控制台加的 Apple ID 组（邮箱 + App 专用密码）
+    scripts:
+      - name: Get packages
+        script: flutter pub get
+
+      - name: Set up signing
+        # Codemagic 会从 app_store_credentials 组里读 APPLE_ID / APPLE_PASSWORD / TEAM_ID 等
+        script: |
+          # 注入 Team ID 到 Xcode 工程（开发签名需要）
+          /usr/libexec/PlistBuddy -c "Print" ios/Runner.xcodeproj/project.pbxproj
+          if grep -q 'DEVELOPMENT_TEAM\s*=' ios/Runner.xcodeproj/project.pbxproj; then
+            sed -i '' -E "s/DEVELOPMENT_TEAM = \"[^\"]*\"/DEVELOPMENT_TEAM = \"$TEAM_ID\"/g" ios/Runner.xcodeproj/project.pbxproj
+          else
+            sed -i '' -E "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = \"$TEAM_ID\";/g" ios/Runner.xcodeproj/project.pbxproj
+          fi
+          # 把 Team ID 写进 ExportOptions
+          sed -i '' -E "s|__TEAM_ID__|$TEAM_ID|g" ios/ExportOptions.plist
+
+      - name: Build IPA
+        script: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+
+    publishing:
+      scripts:
+        - name: Print artifact location
+          script: |
+            set -e
+            ls -lh build/ios/ipa/

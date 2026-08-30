@@ -1,0 +1,54 @@
+name: tiejii_app
+description: 铁骥大模型 移动端 / 桌面端 企业级客户端（Flutter 原生）
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 网络：REST + SSE 流式
+  http: ^1.2.2
+  # RSA / PKCS1-v1.5 加密（对齐服务端登录加密）
+  pointycastle: ^3.9.1
+  # 状态管理
+  flutter_riverpod: ^2.6.1
+  # 路由
+  go_router: ^14.8.0
+  # 打开外部链接（文件预览兜底「在浏览器打开」）
+  url_launcher: ^6.3.0
+  # 文件预览：在 APP 内嵌 WebView 渲染 PDF / Office / HTML 等
+  webview_flutter: ^4.10.0
+  # 本地持久化（JWT）
+  shared_preferences: ^2.3.3
+  # iOS 风格图标占位（消除构建时 cupertino_icons 字体缺失告警）
+  cupertino_icons: ^1.0.9
+  # 自定义 SVG 图标（顶栏面包菜单 / 声音 / 禁音 / 新增，直接渲染 assets/icons/*.svg）
+  # 不依赖 Phosphor / Lucide：两者内部 `extends IconData`，在 Dart 3.13+（IconData 变 final）下编译失败
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  # Windows 安装包（.msix）：flutter build windows 后用 `dart run msix:build` 生成
+  msix: ^3.16.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/title.png
+
+msix_config:
+  display_name: 铁骥大模型
+  publisher_display_name: TieJi
+  identity_name: com.tiejii.app
+  logo_path: assets/title.png
+  # publisher 证书：首次打包前在本机执行 `dart run msix:create`
+  # （按提示填发布者名称、生成自签名测试证书 test_certificate.pfx，
+  #  msix 会把 publisher: CN=... 自动写回这里）。
+  # 测试证书签名的 .msix 安装时会提示「未知发布者」，可正常安装用于验证。

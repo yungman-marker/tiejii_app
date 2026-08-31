@@ -2,21 +2,24 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- 免费 Apple ID 只能 development 签名（不能 app-store / ad-hoc 分发），
-         这种 ipa 可被 AltStore / SideStore 侧载到「已注册 UDID」的设备 -->
+    <!-- 开发签名：免费 Apple ID 唯一可走的方式（非 App Store / 非 Ad-hoc） -->
     <key>method</key>
     <string>development</string>
     <key>signingStyle</key>
     <string>automatic</string>
-    <key>teamID</key>
-    <string>__TEAM_ID__</string>
+    <!-- 你的免费 Apple ID 对应的 Team ID（在 Apple 账号页面 "Team ID" 查看）。
+         Codemagic 用 Apple Service Connect 登录后会自动填充证书/描述文件，
+         这里留 YOUR_TEAM_ID 占位，或在 Codemagic 里用环境变量覆盖。 -->
+    <key>teamId</key>
+    <string>YOUR_TEAM_ID</string>
     <key>uploadBitcode</key>
     <false/>
     <key>uploadSymbols</key>
-    <true/>
-    <key>compileBitcode</key>
     <false/>
     <key>stripSwiftSymbols</key>
     <true/>
+    <!-- 免费账号只做开发分发，不做 App Store 上传 -->
+    <key>destination</key>
+    <string>export</string>
 </dict>
 </plist>

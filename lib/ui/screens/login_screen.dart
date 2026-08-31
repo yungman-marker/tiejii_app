@@ -94,31 +94,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // ---------- 移动端：顶部背景图 + 下方白色卡片 ----------
 
   Widget _buildMobile(AuthState auth) {
-    return Column(
-      children: [
-        // 移动端顶部图：与桌面端 _LoginBackground 完全解耦。
-        // 新素材 assets/login_mobile_top.png 原比例 602×396 ≈ 1.52:1，
-        // 用 AspectRatio 自适应屏宽、保持比例渲染；
-        // 桌面端代码（_LoginBackground / login_bg.png）完全不变。
-        AspectRatio(
-          aspectRatio: 602 / 396,
-          child: Image.asset(
-            'assets/login_mobile_top.png',
-            fit: BoxFit.contain,
-            alignment: Alignment.center,
-            errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-            child: _FormCard(
-              isWide: false,
-              child: _buildFormColumn(auth),
+    // 用与图片最底行边缘一致的色 #EDF1FC（采自 login_mobile_top.png 底部两侧 1/3 区域），
+    // 把整个 body 容器填成这个色，让图片下沿与下方背景完全无缝衔接，
+    // 视觉上看起来「一整张图片作为页面背景」。桌面端 _buildDesktop 不动。
+    return Container(
+      color: const Color(0xFFEDF1FC),
+      child: Column(
+        children: [
+          // 移动端顶部图：与桌面端 _LoginBackground 完全解耦。
+          // 新素材 assets/login_mobile_top.png 原比例 602×396 ≈ 1.52:1，
+          // 用 AspectRatio 自适应屏宽、保持比例渲染；
+          // 桌面端代码（_LoginBackground / login_bg.png）完全不变。
+          AspectRatio(
+            aspectRatio: 602 / 396,
+            child: Image.asset(
+              'assets/login_mobile_top.png',
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+              child: _FormCard(
+                isWide: false,
+                child: _buildFormColumn(auth),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

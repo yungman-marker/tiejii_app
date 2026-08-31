@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 
 /// 数据管理（/me/data），样式参考「DeepSeek App · Data controls」：
@@ -65,13 +66,15 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = isDesktop(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+        leading: isWide
+            ? const SizedBox.shrink()
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: () => context.pop(),
+              ),
         title: const Text('数据管理'),
         centerTitle: true,
       ),
@@ -154,35 +157,42 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     );
   }
 
-  Widget _sectionHeader(String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-            letterSpacing: 0.4,
-          ),
-        ),
-      );
-
-  Widget _group(List<Widget> rows) => Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x11000000),
-              blurRadius: 6,
-              offset: Offset(0, 1),
+  Widget _sectionHeader(String text) => Builder(builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+              letterSpacing: 0.4,
             ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(children: rows),
-      );
+          ),
+        );
+      });
+
+  Widget _group(List<Widget> rows) => Builder(builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: scheme.outline),
+            boxShadow: [
+              if (Theme.of(ctx).brightness == Brightness.light)
+                const BoxShadow(
+                  color: Color(0x11000000),
+                  blurRadius: 6,
+                  offset: Offset(0, 1),
+                ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: rows),
+        );
+      });
 
   Widget _switchRow(
     IconData icon,
@@ -191,49 +201,52 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     bool value,
     ValueChanged<bool> onChanged,
   ) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.divider, width: 0.5),
+      Builder(builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: scheme.outlineVariant, width: 0.5),
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: AppColors.textSecondary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
+          child: Row(
+            children: [
+              Icon(icon, size: 19, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: AppColors.textTertiary,
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Switch(
-              value: value,
-              activeThumbColor: AppColors.primary,
-              activeTrackColor: AppColors.primarySoft,
-              onChanged: onChanged,
-            ),
-          ],
-        ),
-      );
+              Switch(
+                value: value,
+                activeThumbColor: scheme.primary,
+                activeTrackColor: AppColors.primarySoft,
+                onChanged: onChanged,
+              ),
+            ],
+          ),
+        );
+      });
 
   Widget _row(
     IconData icon,
@@ -241,38 +254,40 @@ class _DataManagementScreenState extends State<DataManagementScreen> {
     Color? labelColor,
     Color? iconColor,
     VoidCallback? onTap,
-  }) {
-    final fg = labelColor ?? AppColors.textPrimary;
-    final iconClr = iconColor ?? AppColors.textSecondary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(icon, size: 19, color: iconClr),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: fg,
+  }) =>
+      Builder(builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        final fg = labelColor ?? scheme.onSurface;
+        final iconClr = iconColor ?? scheme.onSurfaceVariant;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(icon, size: 19, color: iconClr),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: fg,
+                      ),
+                    ),
                   ),
-                ),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 17,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.chevron_right,
-                size: 17,
-                color: AppColors.textTertiary,
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      });
 }

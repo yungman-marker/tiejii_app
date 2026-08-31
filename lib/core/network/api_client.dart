@@ -35,6 +35,12 @@ class ApiClient {
 
   /// [hasBody] 为 false 时（如无请求体的 GET）不带 `Content-Type`：
   /// 该头对 GET 无意义，却会在浏览器里触发额外的 CORS 预检。
+  ///
+  /// 注意：不要自行补 `Origin` / `Referer` 头。web 前端是同源请求，
+  /// 浏览器在同源场景下并不会额外发送这两个头；桌面端硬塞一个
+  /// `Origin` 反而可能被内网网关当成"跨域请求"走另一套校验链，
+  /// 导致部分端点（如 /ai/chat/model/list）无故返回 500。保持与
+  /// web 一致的"最小请求头"最稳。
   Map<String, String> _headers({required bool auth, bool hasBody = true}) {
     final headers = <String, String>{
       if (hasBody) 'Content-Type': 'application/json',
@@ -93,7 +99,14 @@ class ApiClient {
         return _send<T>(method, path,
             body: body, parser: parser, auth: auth, retried: true);
       }
-      throw ApiException(code, decoded['msg']?.toString() ?? '请求失败（$code）');
+      // 关键：用 `request.body`（jsonEncode 之后的真实字节）展示，
+      // 而不是直接把 Dart Map `body` 传进去——`{clientType: MOBILE}`
+      // 是 Map.toString 风格，跟实际 HTTP wire 上的 `{"clientType":"MOBILE"}`
+      // 不一样，肉眼对比会完全误导定位。
+      final reqInfo =
+          ' [req: $method $path | body=${request.body.isEmpty ? '<none>' : request.body}]';
+      throw ApiException(
+          code, '${decoded['msg']?.toString() ?? '请求失败（$code）'}$reqInfo');
     }
 
     final data = decoded['data'];

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 
@@ -72,13 +73,18 @@ class MeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 桌面端（master-detail 容器）：没有"上一级"概念，← 去掉。
+    // 导航由中间的 240px 菜单 + 顶部面包屑统一负责。
+    // 移动/窄屏：保留 ← 走 Navigator.pop，回到上一页（通常是抽屉 push 之前的位置）。
+    final isWide = isDesktop(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+        leading: isWide
+            ? const SizedBox.shrink()
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: () => context.pop(),
+              ),
         title: const Text('个人中心'),
         centerTitle: true,
       ),
@@ -92,22 +98,27 @@ class MeScreen extends ConsumerWidget {
 
 /// 圆角白卡容器：函数式而非 widget 类，避免父级 children 触发
 /// `prefer_const_constructors` 提示（容器即 const 友好 + boxShadow 装饰）。
-Widget _group(List<Widget> rows) => Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x11000000),
-            blurRadius: 6,
-            offset: Offset(0, 1),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: rows),
-    );
+Widget _group(List<Widget> rows) => Builder(builder: (ctx) {
+      final scheme = Theme.of(ctx).colorScheme;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: scheme.outline),
+          boxShadow: [
+            if (Theme.of(ctx).brightness == Brightness.light)
+              const BoxShadow(
+                color: Color(0x11000000),
+                blurRadius: 6,
+                offset: Offset(0, 1),
+              ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: rows),
+      );
+    });
 
 /// 单行菜单：图标 + 菜单名 +（可选右侧文字）+ 箭头；
 /// 末行无下边线；菜单名 / 图标可独立配色（用于退出登录红色）。
@@ -119,70 +130,75 @@ Widget _row(
   Color? labelColor,
   VoidCallback? onTap,
 }) {
-  final fg = labelColor ?? AppColors.textPrimary;
-  final iconClr = iconColor ?? AppColors.textSecondary;
+  return Builder(builder: (ctx) {
+    final scheme = Theme.of(ctx).colorScheme;
+    final fg = labelColor ?? scheme.onSurface;
+    final iconClr = iconColor ?? scheme.onSurfaceVariant;
 
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: const BoxDecoration(
-          border: Border(
-            bottom: BorderSide(color: AppColors.divider, width: 0.5),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 19, color: iconClr),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: fg,
-                ),
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: scheme.outlineVariant, width: 0.5),
             ),
-            if (trailing != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 19, color: iconClr),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Text(
-                  trailing,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textTertiary,
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: fg,
                   ),
                 ),
               ),
-            const Icon(
-              Icons.chevron_right,
-              size: 17,
-              color: AppColors.textTertiary,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-/// 分组小标题：浅灰小字。
-Widget _sectionHeader(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
-          letterSpacing: 0.4,
+              if (trailing != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Text(
+                    trailing,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              Icon(
+                Icons.chevron_right,
+                size: 17,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
+  });
+}
+
+/// 分组小标题：浅灰小字。
+Widget _sectionHeader(String text) => Builder(builder: (ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+            letterSpacing: 0.4,
+          ),
+        ),
+      );
+    });
 
 void _tip(BuildContext ctx, String message) =>
     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(message)));

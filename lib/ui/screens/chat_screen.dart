@@ -19,6 +19,8 @@ import '../widgets/top_bar_action_button.dart';
 import '../widgets/top_bar_icons.dart';
 import '../../providers/quick_entry_provider.dart';
 import '../widgets/quick_entry.dart';
+import '../../core/responsive.dart';
+import '../widgets/model_sheet.dart';
 
 /// 顶栏标题硬截断上限：超过该字符数（含中文 1 字 = 1 字符）则截到上限 - 1 + `…`。
 /// - mobile 顶栏可用宽度 ≈ 219px，16 号中文每字 ≈ 16px → 约 13 字；
@@ -65,6 +67,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final chat = ref.watch(chatControllerProvider);
     final availabilityNotice = ref.watch(modelAvailabilityProvider).notice;
+    final isWide = isDesktop(context);
 
     // 消息数量变化时自动滚到底（打字机过程中持续跟随）
     ref.listen<int>(
@@ -91,12 +94,41 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       },
     );
 
+    // 移动端主体内容：与 gitee 原版一致，直接全宽 Column，不套 Center/ConstrainedBox。
+    // 桌面宽屏才需要"内容居中 + 限制最大宽度"的阅读体验（见下方 body 的 isWide 分支）。
+    final bodyChildren = <Widget>[
+      Expanded(
+        child: chat.historyLoading
+            ? _buildHistoryLoading()
+            : (chat.isEmpty ? _buildEmptyState() : _buildMessageList(chat)),
+      ),
+      if (chat.error != null) _buildErrorBar(chat.error!),
+      if (availabilityNotice != null)
+        _buildAvailabilityBanner(availabilityNotice),
+      if (_attachments.isNotEmpty) _attachmentChips(),
+      ChatInputBar(
+        streaming: chat.streaming,
+        onSend: _send,
+        onStop: () => ref.read(chatControllerProvider.notifier).stop(),
+        onCamera: () => _pickAndUpload(
+          extensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
+          mode: _PickMode.camera,
+        ),
+        onGallery: () => _pickAndUpload(
+          extensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
+          mode: _PickMode.gallery,
+        ),
+        onFile: () => _pickAndUpload(mode: _PickMode.file),
+        onVoice: () => _tip('语音输入待接入'),
+        deepThinking: _deepThinking,
+        onToggleDeepThinking: (v) => setState(() => _deepThinking = v),
+      ),
+    ];
+
     return Scaffold(
-      backgroundColor: Colors.white, // 全白对话背景（千问 / DeepSeek 风）
-      drawer: const SideDrawer(),
+      drawer: isWide ? null : const SideDrawer(),
       appBar: AppBar(
-        // 顶栏背景白底、轻微阴影（千问 / DeepSeek 风）
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         surfaceTintColor: Colors.transparent,
@@ -104,24 +136,25 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         leadingWidth: 56,
         titleSpacing: 0,
         centerTitle: true,
-        leading: Builder(
-          builder: (innerContext) => Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: TopBarActionButton(
-              tooltip: '菜单',
-              icon: TopBarIcons.menu(),
-              onPressed: () {
-                Scaffold.of(innerContext).openDrawer();
-                // 打开抽屉时若历史为空则自动加载（登录后首次开抽屉也能看到历史）
-                if (ref.read(chatControllerProvider).sessions.isEmpty) {
-                  ref
-                      .read(chatControllerProvider.notifier)
-                      .loadSessions(refresh: true);
-                }
-              },
-            ),
-          ),
-        ),
+        leading: isWide
+            ? null
+            : Builder(
+                builder: (innerContext) => Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: TopBarActionButton(
+                    tooltip: '菜单',
+                    icon: TopBarIcons.menu(),
+                    onPressed: () {
+                      Scaffold.of(innerContext).openDrawer();
+                      if (ref.read(chatControllerProvider).sessions.isEmpty) {
+                        ref
+                            .read(chatControllerProvider.notifier)
+                            .loadSessions(refresh: true);
+                      }
+                    },
+                  ),
+                ),
+              ),
         // 顶部中间：新对话显示「新对话」，历史对话显示该会话标题
         title: _buildAppBarTitle(chat),
         actions: [
@@ -156,41 +189,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: chat.historyLoading
-                ? _buildHistoryLoading()
-                : (chat.isEmpty ? _buildEmptyState() : _buildMessageList(chat)),
-          ),
-          if (chat.error != null) _buildErrorBar(chat.error!),
-          if (availabilityNotice != null)
-            _buildAvailabilityBanner(availabilityNotice),
-          if (_attachments.isNotEmpty) _attachmentChips(),
-          ChatInputBar(
-            streaming: chat.streaming,
-            onSend: _send,
-            onStop: () => ref.read(chatControllerProvider.notifier).stop(),
-            onCamera: () => _pickAndUpload(
-              extensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
-              mode: _PickMode.camera,
-            ),
-            onGallery: () => _pickAndUpload(
-              extensions: const ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'],
-              mode: _PickMode.gallery,
-            ),
-            onFile: () => _pickAndUpload(mode: _PickMode.file),
-            onVoice: () => _tip('语音输入待接入'),
-            deepThinking: _deepThinking,
-            onToggleDeepThinking: (v) => setState(() => _deepThinking = v),
-          ),
-        ],
-      ),
+      // 桌面宽屏：内容居中并限制最大宽度（参照桌面端阅读体验）；
+      // 移动/窄屏：直接全宽 Column（与 gitee 原版一致）。
+      body: isWide
+          ? Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+                child: Column(children: bodyChildren),
+              ),
+            )
+          : Column(children: bodyChildren),
     );
   }
 
   Widget _buildHistoryLoading() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -201,7 +214,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           SizedBox(height: 12),
           Text('正在加载历史对话…',
-              style: TextStyle(fontSize: 13, color: AppColors.textTertiary)),
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -241,19 +254,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             const SizedBox(height: 8),
             Text(
               '已打开会话：$openedSession',
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
+              child: Text(
                 '本会话暂无可展示的历史消息，可直接在此继续向模型提问。',
-                style: TextStyle(fontSize: 12.5, color: AppColors.textTertiary),
+                style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -293,11 +306,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           const SizedBox(height: 10),
           // —— 副标题（左对齐）——
-          const Text(
+          Text(
             '懂工程 更懂你，随时为你答疑解惑',
             style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -371,10 +384,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           softWrap: false,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
       ),
@@ -432,7 +445,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           TextButton(
             onPressed: () {
               ref.read(modelAvailabilityProvider.notifier).clearNotice();
-              Scaffold.of(context).openDrawer();
+              // 宽屏常驻侧栏无 Drawer 可开，直接弹模型面板
+              if (isDesktop(context)) {
+                showModalBottomSheet<void>(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => const ModelSheet(),
+                );
+              } else {
+                Scaffold.of(context).openDrawer();
+              }
             },
             child: const Text('切换模型', style: TextStyle(fontSize: 12.5)),
           ),
@@ -555,7 +577,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _attachmentChips() {
     return Container(
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Wrap(
         spacing: 8,
@@ -597,15 +619,15 @@ class _SuggestionCard extends StatelessWidget {
         // 不加 Expanded，让卡片宽度紧贴文字（自适应）
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppColors.border, width: 0.8),
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          border: Border.all(color: Theme.of(context).colorScheme.outline, width: 0.8),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w500,
             height: 1.4,
           ),

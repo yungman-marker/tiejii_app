@@ -33,6 +33,7 @@ class ChatState {
     this.streaming = false,
     this.thinking = false,
     this.hasMore = true,
+    this.nextCursor,
     this.error,
     this.sessionsLoading = false,
     this.historyLoading = false,
@@ -47,6 +48,10 @@ class ChatState {
   final bool streaming;
   final bool thinking;
   final bool hasMore;
+  /// 历史会话下一页的游标；null 表示没有下一条或者后端未返回。
+  /// 抽屉下滑接近底部时若 [hasMore] && [nextCursor] != null，
+  /// chat_provider 会拉下一页并 append 到 sessions。
+  final String? nextCursor;
   final String? error;
   final bool sessionsLoading;
   /// 正在拉取某个历史会话的消息明细（点击抽屉历史项时短暂为 true）。
@@ -64,6 +69,8 @@ class ChatState {
     bool? streaming,
     bool? thinking,
     bool? hasMore,
+    String? nextCursor,
+    bool clearNextCursor = false,
     String? error,
     bool? sessionsLoading,
     bool? historyLoading,
@@ -83,6 +90,8 @@ class ChatState {
         streaming: streaming ?? this.streaming,
         thinking: thinking ?? this.thinking,
         hasMore: hasMore ?? this.hasMore,
+        // clearNextCursor：清空 cursor 用（最后一页返回 hasMore=false 时配合使用）。
+        nextCursor: clearNextCursor ? null : (nextCursor ?? this.nextCursor),
         error: clearError ? null : (error ?? this.error),
         sessionsLoading: sessionsLoading ?? this.sessionsLoading,
         historyLoading: historyLoading ?? this.historyLoading,
@@ -412,35 +421,87 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// 拉取历史会话列表（POST /ai/chat/his/record/list）。
   ///
-  /// 请求体始终为 `{"filter":"","limit":30}`（**不带 cursor**，否则后端返回翻页
-  /// 窗口、与 Postman/web 顺序不一致）。后端返回顺序即权威顺序，客户端原样展示。
-  /// 用 [_sortSessions] 仅做「按 sessionId 去重」并保留后端顺序（避免下拉刷新
-  /// 并发时重复追加同一项）。
+  /// 调用语义：
+  /// - `refresh: true`  → **重新从首页拉**：清空 sessions 与 cursor，从头再来（用于下拉刷新）。
+  /// - `refresh: false` → **拉下一页**：用现有 `nextCursor` 拉下一页，append 到 sessions。
+  ///   如果服务端返回的 hasMore=false 且 nextCursor=null，本调用相当于 no-op。
+  ///
+  /// 第一页拉取策略：固定 `limit=100` 不带 cursor，匹配 Web/Postman 的请求体。
+  /// 后续页：从响应里取 `nextCursor`/`hasMore`，在抽屉下滑触发后调用本方法拉下一页。
   Future<void> loadSessions({bool refresh = false}) async {
     final repository = _repository;
     if (repository == null) return;
 
     if (refresh) {
-      // 用户主动下拉刷新：从头重拉第一页，清空旧列表。
-      state = state.copyWith(sessions: const [], hasMore: true);
+      // 用户主动下拉刷新：从头重拉第一页，清空旧列表与 cursor。
+      state = state.copyWith(
+        sessions: const [],
+        hasMore: true,
+        clearNextCursor: true,
+      );
+    } else {
+      // 增量翻页：hasMore=false 时不再发请求（避免无限空转）。
+      if (!state.hasMore) return;
     }
-    if (!state.hasMore) return;
 
     state = state.copyWith(sessionsLoading: true);
     try {
-      final page = await repository.fetchSessions();
+      final cursor = refresh ? null : state.nextCursor;
+      final page = await repository.fetchSessions(cursor: cursor);
       // 仅去重、保留后端返回顺序（不再客户端重排，避免打乱 web/Postman 顺序）。
       final combined = _sortSessions([...state.sessions, ...page.items]);
       state = state.copyWith(
         sessions: combined,
-        // 不再使用 cursor 翻页：单页展示（limit=30 覆盖常规使用），避免上拉空转重拉。
-        hasMore: false,
+        // 用后端返回值作为权威；hasMore=false 时同步清空 nextCursor。
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+        clearNextCursor: !page.hasMore || page.nextCursor == null,
         sessionsLoading: false,
       );
     } catch (_) {
       // 历史列表失败不影响主对话
       state = state.copyWith(sessionsLoading: false);
     }
+  }
+
+  /// 多端实时同步用的「静默轮询」。
+  ///
+  /// 与 [loadSessions(refresh:true)] 不同：本方法**不清空**现有列表、也**不显示
+  /// loading 圈**，拉取后对比会话 id 列表；若与当前完全一致则不打扰 UI（避免
+  /// 轮询时列表闪烁），仅当出现新增/删除会话时才更新 state——从而让另一端
+  /// 新建的会话在本端自动出现（覆盖「A 设备建会话、B 设备不操作也看到」的场景）。
+  Future<void> pollSessions() async {
+    final repository = _repository;
+    if (repository == null) return;
+    try {
+      final page = await repository.fetchSessions(cursor: null);
+      // 首页会话（后端权威顺序）。
+      final home = _sortSessions(page.items);
+      // 保留用户主动下滑翻页加载的「首页之外」条目，避免轮询把后端翻页结果清空
+      // （抽屉历史 > 100 条时下滑会追加第 101+ 条，直接替换首页会丢失这些）。
+      final extra = state.sessions.length > home.length
+          ? state.sessions.sublist(home.length)
+          : const <SessionSummary>[];
+      final incoming = _sortSessions([...home, ...extra]);
+      if (_sameSessions(incoming, state.sessions)) return; // 无变化，跳过
+      state = state.copyWith(
+        sessions: incoming,
+        hasMore: page.hasMore,
+        nextCursor: page.nextCursor,
+        clearNextCursor: !page.hasMore || page.nextCursor == null,
+      );
+    } catch (_) {
+      // 轮询失败静默忽略，下个周期再试
+    }
+  }
+
+  /// 对比两个会话列表是否「完全一致」（同顺序、同 sessionId）。
+  bool _sameSessions(List<SessionSummary> a, List<SessionSummary> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].sessionId != b[i].sessionId) return false;
+    }
+    return true;
   }
 
   /// 切换到某个历史会话并拉取消息明细。

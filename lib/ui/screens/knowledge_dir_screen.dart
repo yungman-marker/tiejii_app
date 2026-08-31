@@ -114,7 +114,6 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -129,12 +128,12 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
 
   Widget _header() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+            icon: Icon(Icons.arrow_back_ios_new, size: 18),
             onPressed: () => context.pop(),
           ),
           Expanded(
@@ -144,10 +143,10 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
                 Text(widget.dirName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                SizedBox(height: 2),
                 Text('共 $_total 个文件',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -158,7 +157,7 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
 
   Widget _body() {
     if (_loading) {
-      return const Center(
+      return Center(
           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));
     }
     if (_error != null) {
@@ -166,26 +165,26 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, size: 40, color: AppColors.danger),
-            const SizedBox(height: 10),
+            Icon(Icons.error_outline, size: 40, color: AppColors.danger),
+            SizedBox(height: 10),
             Text(_error!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: () => _load(reset: true), child: const Text('重试')),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            SizedBox(height: 12),
+            FilledButton(onPressed: () => _load(reset: true), child: Text('重试')),
           ]),
         ),
       );
     }
     if (_items.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
           padding: EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.folder_open, size: 40, color: AppColors.textTertiary),
+            Icon(Icons.folder_open, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
             SizedBox(height: 10),
             Text('该目录暂无文件',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ]),
         ),
       );
@@ -201,14 +200,14 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Center(
                 child: _loadingMore
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: AppColors.primary))
                     : TextButton(
                         onPressed: () => _load(reset: false),
-                        child: const Text('加载更多'),
+                        child: Text('加载更多'),
                       ),
               ),
             ),
@@ -225,9 +224,9 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -247,20 +246,20 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
         title: Text(f.displayName,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Row(
             children: [
               if (f.displaySize.isNotEmpty)
                 Text(f.displaySize,
-                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               if (f.displaySize.isNotEmpty && f.createTime != null) ...[
-                const SizedBox(width: 6),
-                const Text('·',
+                SizedBox(width: 6),
+                Text('·',
                     style:
-                        TextStyle(fontSize: 11, color: AppColors.textTertiary)),
-                const SizedBox(width: 6),
+                        TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                SizedBox(width: 6),
               ],
               if (f.createTime != null)
                 Expanded(
@@ -268,9 +267,9 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                          TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
@@ -292,7 +291,7 @@ class _KnowledgeDirScreenState extends ConsumerState<KnowledgeDirScreen> {
           ),
         ),
         trailing:
-            const Icon(Icons.open_in_new, size: 16, color: AppColors.textTertiary),
+            Icon(Icons.open_in_new, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
         onTap: () => _open(f),
       ),
     );

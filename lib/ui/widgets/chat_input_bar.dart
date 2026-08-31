@@ -92,8 +92,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         'assets/icons/stop.svg',
         width: 24,
         height: 24,
-        colorFilter:
-            const ColorFilter.mode(AppColors.textPrimary, BlendMode.srcIn),
+        colorFilter: ColorFilter.mode(
+            Theme.of(context).colorScheme.onSurface, BlendMode.srcIn),
       );
 
   void _submit() {
@@ -106,6 +106,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   Widget build(BuildContext context) {
     final showDeepThink = widget.onToggleDeepThinking != null;
+    final scheme = Theme.of(context).colorScheme;
 
     return Container(
       color: Colors.transparent,
@@ -119,8 +120,8 @@ class _ChatInputBarState extends State<ChatInputBar>
               // ============ 输入框（高圆角白底 + 灰描边）============
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: AppColors.border),
+                  color: scheme.surfaceContainerHighest,
+                  border: Border.all(color: scheme.outline),
                   borderRadius: BorderRadius.circular(26),
                 ),
                 padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
@@ -137,11 +138,11 @@ class _ChatInputBarState extends State<ChatInputBar>
                       onSubmitted: (_) => _submit(),
                       onTap: _collapseExpanded,
                       style: const TextStyle(fontSize: 16, height: 1.4),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: '发消息或按住说话',
                         hintStyle: TextStyle(
                           fontSize: 16,
-                          color: AppColors.textTertiary,
+                          color: scheme.onSurfaceVariant,
                         ),
                         isDense: true,
                         filled: false,
@@ -167,16 +168,16 @@ class _ChatInputBarState extends State<ChatInputBar>
                         // 右侧：展开态显示 ×；否则 ＋（流式进行中时**不替换** ＋）
                         _IconBtn(
                           icon: _expanded
-                              ? const Icon(Icons.close,
-                                  size: 24, color: AppColors.textPrimary)
-                              : const Icon(Icons.add,
-                                  size: 24, color: AppColors.textPrimary),
+                              ? Icon(Icons.close,
+                                  size: 24, color: scheme.onSurface)
+                              : Icon(Icons.add,
+                                  size: 24, color: scheme.onSurface),
                           onTap: _expanded ? _collapseExpanded : _toggleExpanded,
                         ),
                         const SizedBox(width: 4),
                         _IconBtn(
-                          icon: const Icon(Icons.mic_none_outlined,
-                              size: 24, color: AppColors.textPrimary),
+                          icon: Icon(Icons.mic_none_outlined,
+                              size: 24, color: scheme.onSurface),
                           onTap: widget.onVoice ?? () {},
                         ),
                         // 流式中：最右侧**额外**追加「停止输出」按钮（不替换 ＋）。
@@ -284,20 +285,20 @@ class _ExpandedBody extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         // —— 底部：「仅识别图片中的文字」文字描述（不要 Switch）——
-        const Row(
+        Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.info_outline,
               size: 13,
-              color: AppColors.textTertiary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             SizedBox(width: 5),
             Text(
               '仅识别图片中的文字',
               style: TextStyle(
                 fontSize: 12.5,
-                color: AppColors.textTertiary,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ],
@@ -322,15 +323,16 @@ class _DeepThinkCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? _blueFill : Colors.white,
+          color: active ? _blueFill : scheme.surfaceContainerHighest,
           border: Border.all(
-            color: active ? _blueBorder : AppColors.border,
+            color: active ? _blueBorder : scheme.outline,
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -342,7 +344,7 @@ class _DeepThinkCapsule extends StatelessWidget {
               width: 15,
               height: 15,
               colorFilter: ColorFilter.mode(
-                active ? _blueText : AppColors.textPrimary,
+                active ? _blueText : scheme.onSurface,
                 BlendMode.srcIn,
               ),
             ),
@@ -352,7 +354,7 @@ class _DeepThinkCapsule extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: active ? _blueText : AppColors.textPrimary,
+                color: active ? _blueText : scheme.onSurface,
               ),
             ),
           ],
@@ -380,13 +382,14 @@ class _PickupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         height: 100,
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F6F8),
+          color: scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -397,17 +400,17 @@ class _PickupCard extends StatelessWidget {
               iconPath,
               width: 28,
               height: 28,
-              colorFilter: const ColorFilter.mode(
-                Color(0xFF1F1F1F),
+              colorFilter: ColorFilter.mode(
+                scheme.onSurface,
                 BlendMode.srcIn,
               ),
             ),
             const SizedBox(height: 10),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13.5,
-                color: AppColors.textPrimary,
+                color: scheme.onSurface,
                 fontWeight: FontWeight.w500,
               ),
             ),

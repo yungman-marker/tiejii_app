@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # 网络：REST + SSE 流式
   http: ^1.2.2
@@ -29,6 +31,8 @@ dependencies:
   # 自定义 SVG 图标（顶栏面包菜单 / 声音 / 禁音 / 新增，直接渲染 assets/icons/*.svg）
   # 不依赖 Phosphor / Lucide：两者内部 `extends IconData`，在 Dart 3.13+（IconData 变 final）下编译失败
   flutter_svg: ^2.0.10+1
+  # 桌面端窗口管理：限制窗口最小尺寸，避免被拖到过小导致内容展示不全
+  window_manager: ^0.5.1
 
 dev_dependencies:
   flutter_test:
@@ -42,12 +46,15 @@ flutter:
   assets:
     - assets/icons/
     - assets/title.png
+    - assets/login_bg.png
 
 msix_config:
   display_name: 铁骥大模型
   publisher_display_name: TieJi
   identity_name: com.tiejii.app
-  logo_path: assets/title.png
+  # 应用 logo（铁骥机械马）。msix 会自动从中生成 StoreLogo / tile / 各种尺寸，
+  # 要求至少 256×256，PNG 透明或纯色背景均可。
+  logo_path: assets\msix_logo.png
   # publisher 证书：首次打包前在本机执行 `dart run msix:create`
   # （按提示填发布者名称、生成自签名测试证书 test_certificate.pfx，
   #  msix 会把 publisher: CN=... 自动写回这里）。

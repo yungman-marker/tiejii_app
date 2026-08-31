@@ -1,20 +1,23 @@
-import 'dart:convert';
-
 import '../../core/config/app_config.dart';
 import '../../core/network/api_client.dart';
 import '../models/models.dart';
 
-/// 模型仓库：模型列表 + 移动端默认模型。
+/// 模型仓库：模型列表。
 class ModelRepository {
   ModelRepository(this._api);
 
   final ApiClient _api;
 
   /// POST /ai/chat/model/list
+  ///
+  /// body 带 `clientType`，与 web 前端发出的请求保持一致。
+  /// 默认模型不由本仓库单独拉取——web 端根本不调 getDefault，
+  /// 而是直接从 list 响应里的 `isDefault` 字段挑默认，
+  /// 见 [ModelController._pickDefaultId]。
   Future<List<ChatModel>> fetchModels() async {
     final data = await _api.post<List<dynamic>>(
       '/ai/chat/model/list',
-      body: {},
+      body: {'clientType': AppConfig.clientType},
       parser: (raw) => raw is List<dynamic> ? raw : null,
     );
     if (data == null) return const [];
@@ -24,31 +27,7 @@ class ModelRepository {
         .toList();
   }
 
-  /// POST /ai/chat/model/getDefault
-  ///
-  /// 响应中 `chatModelCode` 是一段 JSON 字符串，形如：
-  /// `{"mobile":"2068620425530499073","pc":["2068616013315629058"]}`
-  /// 需要二次解析取 `mobile` 字段作为移动端默认模型 id。
-  Future<String?> fetchDefaultMobileModelId() async {
-    final data = await _api.post<Map<String, dynamic>>(
-      '/ai/chat/model/getDefault',
-      body: {'clientType': AppConfig.clientType},
-      parser: (raw) => raw is Map<String, dynamic> ? raw : null,
-    );
-
-    final rawCode = data?['chatModelCode'];
-    if (rawCode == null) return null;
-
-    if (rawCode is String) {
-      try {
-        final decoded = jsonDecode(rawCode);
-        if (decoded is Map<String, dynamic>) {
-          return decoded['mobile']?.toString();
-        }
-      } catch (_) {
-        return rawCode; // 非 JSON，直接当作模型 id
-      }
-    }
-    return null;
-  }
+  /// 默认模型不再单独请求 getDefault（web 端根本不调该端点，
+  /// 且后端对其 body 严格校验会 500）。默认模型直接从 list 响应里的
+  /// `isDefault` 字段取（`ModelController._pickDefaultId`）。
 }

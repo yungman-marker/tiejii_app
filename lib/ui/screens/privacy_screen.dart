@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 
 /// 隐私与权限（/me/privacy）。
@@ -8,7 +9,17 @@ import '../../core/theme/app_theme.dart';
 /// 中部：系统权限列表（麦克风 / 相机 / 相册 / 位置）
 /// 底部：前往系统权限管理（系统级入口，本端仅占位提示）
 class PrivacyScreen extends StatelessWidget {
-  const PrivacyScreen({super.key});
+  const PrivacyScreen({super.key, this.onMemoryTap});
+
+  /// 覆盖「长期记忆设置」入口的点击行为。
+  ///
+  /// 默认（独立使用时）= `() => context.push('/me/memory')`。
+  ///
+  /// 当 [PrivacyScreen] 被设置弹层（`SettingsDialog`）**嵌入**右侧时，
+  /// 弹层挂在 root Navigator 上、`context.push` 会被弹层盖住、视觉上
+  /// 看不到新页面（go_router 已切路由但弹层未关）。此时弹层会传入
+  /// 「先关弹层再 push 路由」的回调。
+  final VoidCallback? onMemoryTap;
 
   /// 模拟系统权限状态（与设计稿一致）。如接入原生权限 SDK 替换此处即可。
   static const Map<String, _Perm> _permissions = {
@@ -20,13 +31,15 @@ class PrivacyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = isDesktop(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+        leading: isWide
+            ? const SizedBox.shrink()
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: () => context.pop(),
+              ),
         title: const Text('隐私与权限'),
         centerTitle: true,
       ),
@@ -42,16 +55,16 @@ class PrivacyScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
               children: [
                 _MemoryEntryCard(
-                  onTap: () => context.push('/me/memory'),
+                  onTap: onMemoryTap ?? () => context.push('/me/memory'),
                 ),
                 const SizedBox(height: 18),
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(4, 0, 0, 10),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 0, 10),
                   child: Text(
                     '为提供更好的体验，铁骥大模型将向你请求以下系统权限',
                     style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textTertiary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.5),
                   ),
                 ),
@@ -61,8 +74,14 @@ class PrivacyScreen extends StatelessWidget {
                   child: _SystemPermissionButton(
                     onTap: () => ScaffoldMessenger.of(context)
                       ..hideCurrentSnackBar()
-                      ..showSnackBar(const SnackBar(
-                        content: Text('系统权限管理：由手机系统提供'),
+                      ..showSnackBar(SnackBar(
+                        content: Text(
+                          '系统权限管理：由手机系统提供',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onPrimary),
+                        ),
+                        backgroundColor:
+                            Theme.of(context).colorScheme.primary,
                         behavior: SnackBarBehavior.floating,
                       )),
                   ),
@@ -86,8 +105,9 @@ class _MemoryEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -96,7 +116,7 @@ class _MemoryEntryCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
+            border: Border.all(color: scheme.outline),
           ),
           child: Row(
             children: [
@@ -107,11 +127,11 @@ class _MemoryEntryCard extends StatelessWidget {
                     color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(10)),
                 alignment: Alignment.center,
-                child: const Icon(Icons.settings_outlined,
-                    size: 18, color: AppColors.primary),
+                child: Icon(Icons.settings_outlined,
+                    size: 18, color: scheme.primary),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -119,22 +139,22 @@ class _MemoryEntryCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
-                    SizedBox(height: 2),
+                            color: scheme.onSurface)),
+                    const SizedBox(height: 2),
                     Text('开启后 AI 会记住你的岗位与偏好',
                         style: TextStyle(
                             fontSize: 11.5,
-                            color: AppColors.textTertiary,
+                            color: scheme.onSurfaceVariant,
                             height: 1.4)),
                   ],
                 ),
               ),
-              const Text('已开启',
+              Text('已开启',
                   style: TextStyle(
-                      fontSize: 12, color: AppColors.textTertiary)),
+                      fontSize: 12, color: scheme.onSurfaceVariant)),
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right,
-                  size: 16, color: AppColors.textTertiary),
+              Icon(Icons.chevron_right,
+                  size: 16, color: scheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -149,12 +169,13 @@ class _PermissionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final entries = permissions.entries.toList();
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         children: List.generate(entries.length, (i) {
@@ -166,25 +187,27 @@ class _PermissionsCard extends StatelessWidget {
             decoration: BoxDecoration(
               border: isLast
                   ? null
-                  : const Border(
+                  : Border(
                       bottom: BorderSide(
-                          color: AppColors.divider, width: 0.5)),
+                          color: scheme.outlineVariant, width: 0.5)),
             ),
             child: Row(
               children: [
-                Icon(p.icon, size: 20, color: AppColors.textSecondary),
+                Icon(p.icon, size: 20, color: scheme.onSurfaceVariant),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(name,
-                      style: const TextStyle(
-                          fontSize: 13.5, fontWeight: FontWeight.w600)),
+                      style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurface)),
                 ),
                 Text(p.status,
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textTertiary)),
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
                 const SizedBox(width: 4),
-                const Icon(Icons.chevron_right,
-                    size: 16, color: AppColors.textTertiary),
+                Icon(Icons.chevron_right,
+                    size: 16, color: scheme.onSurfaceVariant),
               ],
             ),
           );

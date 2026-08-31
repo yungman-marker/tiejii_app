@@ -60,7 +60,6 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -70,20 +69,20 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
                 children: [
-                  const Padding(
+                  Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 8),
-                    child: Text('热门搜索', style: TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.w700)),
+                    child: Text('热门搜索', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
                   ),
                   Wrap(
                     spacing: 8, runSpacing: 8,
                     children: _hot.map((label) => _Chip(label: label, onTap: () => _go(label))).toList(),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   Padding(
                     padding: const EdgeInsets.only(left: 4, bottom: 8),
                     child: Row(
                       children: [
-                        const Text('最近搜索', style: TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.w700)),
+                        Text('最近搜索', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
                         const Spacer(),
                         if (_recent.isNotEmpty)
                           GestureDetector(
@@ -92,7 +91,7 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
                               await prefs.remove(_kRecent);
                               setState(() => _recent = const []);
                             },
-                            child: const Text('清空', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                            child: Text('清空', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                           ),
                       ],
                     ),
@@ -112,12 +111,12 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
 
   Widget _searchBar() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+            icon: Icon(Icons.arrow_back_ios_new, size: 18),
             onPressed: () => context.pop(),
           ),
           Expanded(
@@ -125,23 +124,23 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
               height: 38,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: AppColors.surfaceMuted,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search, size: 18, color: AppColors.textTertiary),
-                  const SizedBox(width: 8),
+                  Icon(Icons.search, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _ctrl,
                       autofocus: true,
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _go(_ctrl.text),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         border: InputBorder.none,
                         hintText: '搜索知识库 · AI 总结',
-                        hintStyle: TextStyle(fontSize: 13, color: AppColors.textTertiary),
+                        hintStyle: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                   ),
@@ -149,10 +148,10 @@ class _KbSearchScreenState extends State<KbSearchScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           TextButton(
             onPressed: () => _go(_ctrl.text),
-            child: const Text('搜索', style: TextStyle(color: AppColors.primary)),
+            child: Text('搜索', style: TextStyle(color: AppColors.primary)),
           ),
         ],
       ),
@@ -171,11 +170,11 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        child: Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ),
     );
   }
@@ -191,16 +190,16 @@ class _RecentItem extends StatelessWidget {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.divider))),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Theme.of(context).colorScheme.outlineVariant))),
         child: Row(
           children: [
-            const Icon(Icons.history, size: 16, color: AppColors.textTertiary),
-            const SizedBox(width: 10),
+            Icon(Icons.history, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            SizedBox(width: 10),
             Expanded(
               child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                  style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface)),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 13, color: AppColors.textTertiary),
+            Icon(Icons.arrow_forward_ios, size: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -215,7 +214,7 @@ class _Empty extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
       alignment: Alignment.center,
-      child: const Text('暂无最近搜索', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+      child: Text('暂无最近搜索', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
     );
   }
 }

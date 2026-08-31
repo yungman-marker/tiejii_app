@@ -15,17 +15,17 @@ class AgentDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(agentDetailProvider(agentId));
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: scheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_ios_new, size: 18, color: scheme.onSurface),
           onPressed: () => context.pop(),
         ),
-        title: const Text('智能体', style: TextStyle(fontSize: 16, color: AppColors.textPrimary)),
+        title: Text('智能体', style: TextStyle(fontSize: 16, color: scheme.onSurface)),
         centerTitle: true,
       ),
       body: detail.when(

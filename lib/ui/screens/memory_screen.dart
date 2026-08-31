@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 
 /// 记忆设置（/me/memory）。
@@ -61,7 +62,17 @@ const _mockMemories = <_MemoryItem>[
 ];
 
 class MemoryScreen extends StatefulWidget {
-  const MemoryScreen({super.key});
+  const MemoryScreen({super.key, this.onBack});
+
+  /// 覆盖返回行为。
+  ///
+  /// 默认（走 `/me/memory` 路由独立使用）= null，此时 AppBar 的返回键按
+  /// `isDesktop` 判定（桌面端隐藏、移动端 `context.pop()`）。
+  ///
+  /// 当 [MemoryScreen] 被设置弹层（`SettingsDialog`）**嵌入**右侧作为二级页
+  /// 时，弹层会传入「回到上一层分类页」的回调——此时**必须**显示返回键，
+  /// 且不能走 `context.pop()`（那会把整个弹层关掉）。
+  final VoidCallback? onBack;
 
   @override
   State<MemoryScreen> createState() => _MemoryScreenState();
@@ -74,6 +85,7 @@ class _MemoryScreenState extends State<MemoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = isDesktop(context);
     final list = _enabled
         ? _mockMemories
             .asMap()
@@ -83,13 +95,22 @@ class _MemoryScreenState extends State<MemoryScreen> {
             .toList()
         : <_MemoryItem>[];
 
+    // 被弹层嵌入时（onBack != null）必须显示返回键并走回调——
+    // 用 context.pop() 会把整个弹层关掉。
+    final back = widget.onBack;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+        leading: back != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: back,
+              )
+            : (isWide
+                ? const SizedBox.shrink()
+                : IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                    onPressed: () => context.pop(),
+                  )),
         title: const Text('记忆设置'),
         centerTitle: true,
       ),
@@ -129,16 +150,17 @@ class _MemoryScreenState extends State<MemoryScreen> {
       );
 
   Widget _enableCard() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -146,12 +168,12 @@ class _MemoryScreenState extends State<MemoryScreen> {
                     style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary)),
-                SizedBox(height: 2),
+                        color: scheme.onSurface)),
+                const SizedBox(height: 2),
                 Text('开启后 AI 会记住你的岗位与偏好，回复更贴合',
                     style: TextStyle(
                         fontSize: 11.5,
-                        color: AppColors.textTertiary,
+                        color: scheme.onSurfaceVariant,
                         height: 1.5)),
               ],
             ),
@@ -159,9 +181,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
           Switch(
             value: _enabled,
             onChanged: (v) => setState(() => _enabled = v),
-            activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.primary,
-            inactiveTrackColor: AppColors.border,
+            activeThumbColor: scheme.surface,
+            activeTrackColor: scheme.primary,
+            inactiveTrackColor: scheme.outline,
           ),
         ],
       ),
@@ -169,22 +191,23 @@ class _MemoryScreenState extends State<MemoryScreen> {
   }
 
   Widget _retentionCard() {
+    final scheme = Theme.of(context).colorScheme;
     const opts = ['30天', '90天', '永久'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('记忆保留时间',
+          Text('记忆保留时间',
               style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary)),
+                  color: scheme.onSurface)),
           const SizedBox(height: 12),
           Row(
             children: opts.map((o) {
@@ -193,7 +216,9 @@ class _MemoryScreenState extends State<MemoryScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Material(
-                    color: selected ? AppColors.primary : AppColors.background,
+                    color: selected
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(20),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
@@ -206,8 +231,8 @@ class _MemoryScreenState extends State<MemoryScreen> {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: selected
-                                    ? Colors.white
-                                    : AppColors.textPrimary)),
+                                    ? scheme.onPrimary
+                                    : scheme.onSurface)),
                       ),
                     ),
                   ),
@@ -233,19 +258,20 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textTertiary,
+                  color: scheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600)),
           const Spacer(),
           Text(trailing,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textTertiary)),
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -264,14 +290,15 @@ class _MemoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tagColor = item.danger ? AppColors.danger : AppColors.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final tagColor = item.danger ? scheme.error : scheme.primary;
     final tagBg = item.danger ? AppColors.dangerSoft : AppColors.primarySoft;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,8 +317,8 @@ class _MemoryCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(item.time,
-                  style: const TextStyle(
-                      fontSize: 11, color: AppColors.textTertiary)),
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant)),
               const SizedBox(width: 8),
               _iconBtn(Icons.add, onTap: onApply),
               const SizedBox(width: 4),
@@ -300,9 +327,9 @@ class _MemoryCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(item.description,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12.5,
-                  color: AppColors.textPrimary,
+                  color: scheme.onSurface,
                   height: 1.7)),
         ],
       ),
@@ -310,15 +337,18 @@ class _MemoryCard extends StatelessWidget {
   }
 
   Widget _iconBtn(IconData icon, {required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        width: 26,
-        height: 26,
-        alignment: Alignment.center,
-        child: Icon(icon, size: 17, color: AppColors.textTertiary),
-      ),
-    );
+    return Builder(builder: (ctx) {
+      final scheme = Theme.of(ctx).colorScheme;
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          child: Icon(icon, size: 17, color: scheme.onSurfaceVariant),
+        ),
+      );
+    });
   }
 }

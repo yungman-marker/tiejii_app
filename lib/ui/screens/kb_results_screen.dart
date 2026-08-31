@@ -121,7 +121,6 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -136,18 +135,18 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
 
   Widget _header() {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+            icon: Icon(Icons.arrow_back_ios_new, size: 18),
             onPressed: () => context.pop(),
           ),
           Expanded(
             child: Text(
               _searchResultTitle(widget.query),
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -164,14 +163,14 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
       children: [
         _summaryCard(),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text('知识库来源（${_sources.length}）',
-              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.w700)),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700)),
         ),
         if (_loadingSources)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
           )
@@ -179,7 +178,7 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 20),
             alignment: Alignment.center,
-            child: const Text('未检索到相关来源', style: TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+            child: Text('未检索到相关来源', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           )
         else
           ..._sources.map(_sourceTile),
@@ -200,29 +199,29 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
-              const SizedBox(width: 6),
-              const Text('AI 总结',
+              Icon(Icons.auto_awesome, size: 16, color: AppColors.primary),
+              SizedBox(width: 6),
+              Text('AI 总结',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
               if (_streaming) ...[
-                const SizedBox(width: 8),
-                const SizedBox(width: 12, height: 12,
+                SizedBox(width: 8),
+                SizedBox(width: 12, height: 12,
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
               ],
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           if (_error != null)
             Text(_error!,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.danger, height: 1.6))
+                style: TextStyle(fontSize: 12.5, color: AppColors.danger, height: 1.6))
           else if (_summary.isEmpty && _streaming)
-            const Text('正在生成总结…',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.6))
+            Text('正在生成总结…',
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6))
           else if (_summary.isEmpty)
-            const Text('暂无总结', style: TextStyle(fontSize: 12, color: AppColors.textTertiary, height: 1.6))
+            Text('暂无总结', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6))
           else
             SelectableText(_summary,
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.6)),
+                style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6)),
         ],
       ),
     );
@@ -233,8 +232,8 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider)),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -243,26 +242,26 @@ class _KbResultsScreenState extends ConsumerState<KbResultsScreen> {
               Container(
                 width: 28, height: 28,
                 decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.description_outlined, size: 16, color: AppColors.primary),
+                child: Icon(Icons.description_outlined, size: 16, color: AppColors.primary),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: const Color(0x140F766E), borderRadius: BorderRadius.circular(4)),
-                child: const Text('已入库',
+                child: Text('已入库',
                     style: TextStyle(fontSize: 9.5, color: Color(0xFF0F766E), fontWeight: FontWeight.w700)),
               ),
             ],
           ),
           if (s.snippet != null && s.snippet!.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(s.snippet!,
                 maxLines: 3, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.6)),
+                style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6)),
           ],
         ],
       ),

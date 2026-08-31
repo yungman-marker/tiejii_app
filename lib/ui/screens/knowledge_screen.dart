@@ -8,6 +8,7 @@ import '../../providers/chat_provider.dart';
 import '../../providers/knowledge_provider.dart';
 import '../widgets/file_picker_helper.dart';
 import '../widgets/side_drawer.dart';
+import '../../core/responsive.dart';
 import '../widgets/top_bar_action_button.dart';
 import '../widgets/top_bar_icons.dart';
 
@@ -34,18 +35,21 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(knowledgeControllerProvider);
+    final isWide = isDesktop(context);
     final uploading = state.busyId == '__upload__';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      drawer: const SideDrawer(),
-      body: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            Column(
+      drawer: isWide ? null : const SideDrawer(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+          child: SafeArea(
+            bottom: false,
+            child: Stack(
               children: [
-                _header(),
+                Column(
+                  children: [
+                    _header(isWide),
                 _typeSelector(state.type),
                 Expanded(child: _body(state)),
               ],
@@ -53,7 +57,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
             if (uploading)
               Container(
                 color: Colors.black26,
-                child: const Center(
+                child: Center(
                   child: Card(
                     child: Padding(
                       padding: EdgeInsets.all(20),
@@ -68,33 +72,37 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
               ),
           ],
         ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _header() {
+  Widget _header(bool isWide) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: Row(
         children: [
-          Builder(
-            builder: (ctx) => Padding(
-              padding: const EdgeInsets.only(left: 4),
-                child: TopBarActionButton(
-                tooltip: '菜单',
-                icon: TopBarIcons.menu(),
-                onPressed: () {
-                  Scaffold.of(ctx).openDrawer();
-                  if (ref.read(chatControllerProvider).sessions.isEmpty) {
-                    ref
-                        .read(chatControllerProvider.notifier)
-                        .loadSessions(refresh: true);
-                  }
-                },
-              ),
-            ),
-          ),
-          const Expanded(
+          isWide
+              ? const SizedBox.shrink()
+              : Builder(
+                  builder: (ctx) => Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: TopBarActionButton(
+                      tooltip: '菜单',
+                      icon: TopBarIcons.menu(),
+                      onPressed: () {
+                        Scaffold.of(ctx).openDrawer();
+                        if (ref.read(chatControllerProvider).sessions.isEmpty) {
+                          ref
+                              .read(chatControllerProvider.notifier)
+                              .loadSessions(refresh: true);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+          Expanded(
             child: Center(
               child: Text('知识库', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             ),
@@ -103,7 +111,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: TopBarActionButton(
               tooltip: '筛选',
-              icon: const Icon(Icons.tune, size: 20, color: AppColors.textPrimary),
+              icon: Icon(Icons.tune, size: 20, color: Theme.of(context).colorScheme.onSurface),
               onPressed: () => _tip('筛选：待后端开放'),
             ),
           ),
@@ -111,7 +119,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: TopBarActionButton(
               tooltip: '上传',
-              icon: const Icon(Icons.upload, size: 20, color: AppColors.textPrimary),
+              icon: Icon(Icons.upload, size: 20, color: Theme.of(context).colorScheme.onSurface),
               onPressed: _pickAndUpload,
             ),
           ),
@@ -135,14 +143,14 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
                 decoration: BoxDecoration(
                   color: on ? AppColors.primary : Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: on ? AppColors.primary : AppColors.border),
+                  border: Border.all(color: on ? AppColors.primary : Theme.of(context).colorScheme.outline),
                 ),
                 child: Text(
                   e.value,
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: on ? Colors.white : AppColors.textSecondary,
+                    color: on ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -155,7 +163,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
 
   Widget _body(KnowledgeState state) {
     if (state.loading) {
-      return const Center(
+      return Center(
           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));
     }
     if (state.error != null) {
@@ -163,13 +171,13 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(28),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, size: 40, color: AppColors.danger),
-            const SizedBox(height: 10),
+            Icon(Icons.error_outline, size: 40, color: AppColors.danger),
+            SizedBox(height: 10),
             Text(state.error!, textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-            const SizedBox(height: 12),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            SizedBox(height: 12),
             FilledButton(onPressed: () => ref.read(knowledgeControllerProvider.notifier).load(),
-                child: const Text('重试')),
+                child: Text('重试')),
           ]),
         ),
       );
@@ -183,7 +191,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
         children: [
           _capacityCard(state.capacity),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           if (tree.isEmpty)
             _empty()
           else
@@ -212,25 +220,25 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider)),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
       child: Row(
         children: [
           Container(
             width: 40, height: 40,
             decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.storage_outlined, size: 20, color: AppColors.primary),
+            child: Icon(Icons.storage_outlined, size: 20, color: AppColors.primary),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('已用 ${cap?.usePercent ?? '—'}% · 剩余 ${cap?.remainPercent ?? '—'}%',
-                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                SizedBox(height: 4),
                 Text('文件数 ${cap?.fileNum ?? '—'}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
             ),
           ),
@@ -238,7 +246,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
             width: 70,
             child: LinearProgressIndicator(
               value: _pct(cap?.usePercent),
-              backgroundColor: AppColors.surfaceMuted,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               color: AppColors.primary,
               minHeight: 6,
             ),
@@ -263,8 +271,8 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white, borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider)),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
       child: ListTile(
         contentPadding: EdgeInsets.fromLTRB(8 + indent, 4, 8, 4),
         leading: SizedBox(
@@ -304,19 +312,19 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: fallbackName ? AppColors.danger : AppColors.textPrimary,
+                  color: fallbackName ? AppColors.danger : Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
             if (d.type == 0) ...[
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF7E6),
                   borderRadius: BorderRadius.circular(3),
                 ),
-                child: const Text('共享',
+                child: Text('共享',
                     style: TextStyle(fontSize: 9, color: Color(0xFFD4880E), fontWeight: FontWeight.w700)),
               ),
             ],
@@ -330,16 +338,16 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
               children: [
                 if (hasChildren)
                   Text('${d.children.length} 个子目录',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textTertiary))
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant))
                 else
-                  const Text('空目录',
-                      style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+                  Text('空目录',
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 if ((d.fullPath ?? '').isNotEmpty) ...[
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   Flexible(
                     child: Text(d.fullPath!,
                         maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)),
+                        style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ),
                 ],
               ],
@@ -350,7 +358,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
                 child: Text(
                   '⚠️ 原始字段: ${d.debugKeys}',
                   maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: AppColors.danger, height: 1.3),
+                  style: TextStyle(fontSize: 10, color: AppColors.danger, height: 1.3),
                 ),
               ),
           ],
@@ -359,7 +367,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
           icon: AnimatedRotation(
             turns: expanded ? 0.5 : 0,
             duration: const Duration(milliseconds: 160),
-            child: const Icon(Icons.expand_more, size: 18, color: AppColors.textTertiary),
+            child: Icon(Icons.expand_more, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           // 右箭头 = 展开/折叠（子目录 + 该目录下的文件，文件来自 /file/list）
           onPressed: () =>
@@ -383,10 +391,10 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
       return [
         Padding(
           padding: EdgeInsets.only(left: depth * 14.0 + 14, top: 6, bottom: 6),
-          child: const Row(children: [
+          child: Row(children: [
             SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
             SizedBox(width: 8),
-            Text('加载文件中…', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+            Text('加载文件中…', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ]),
         ),
       ];
@@ -395,7 +403,7 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
       return [
         Padding(
           padding: EdgeInsets.only(left: depth * 14.0 + 14, top: 2, bottom: 6),
-          child: const Text('暂无文件', style: TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+          child: Text('暂无文件', style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ),
       ];
     }
@@ -412,9 +420,9 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
     return Container(
       margin: EdgeInsets.only(left: depth * 14.0, bottom: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -426,12 +434,12 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
               style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: color)),
         ),
         title: Text(f.displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         subtitle: f.displaySize.isNotEmpty
             ? Padding(padding: const EdgeInsets.only(top: 2),
-                child: Text(f.displaySize, style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)))
+                child: Text(f.displaySize, style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)))
             : null,
-        trailing: const Icon(Icons.open_in_new, size: 14, color: AppColors.textTertiary),
+        trailing: Icon(Icons.open_in_new, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
         onTap: () => _openFile(f),
       ),
     );
@@ -441,15 +449,15 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
     return Container(
       margin: EdgeInsets.only(left: depth * 14.0, bottom: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        leading: const Icon(Icons.visibility_outlined, size: 18, color: AppColors.primary),
+        leading: Icon(Icons.visibility_outlined, size: 18, color: AppColors.primary),
         title: Text('查看全部 $total 个文件',
-            style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
+            style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600)),
         onTap: () => context.push(
           '/knowledge/dir?dirId=${Uri.encodeComponent(d.id)}'
           '&name=${Uri.encodeComponent(d.name.isEmpty ? '目录' : d.name)}&type=${d.type}',
@@ -508,14 +516,14 @@ class _KnowledgeScreenState extends ConsumerState<KnowledgeScreen> {
           Container(
             width: 56, height: 56,
             decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.folder_open, size: 28, color: AppColors.primary),
+            child: Icon(Icons.folder_open, size: 28, color: AppColors.primary),
           ),
-          const SizedBox(height: 12),
-          const Text('该知识库暂无目录', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          const Text('点击右上角上传按钮添加文件\nPOST /ai/chat/knowledgebase/file/queryAllDirectoryList',
+          SizedBox(height: 12),
+          Text('该知识库暂无目录', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          SizedBox(height: 6),
+          Text('点击右上角上传按钮添加文件\nPOST /ai/chat/knowledgebase/file/queryAllDirectoryList',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: AppColors.textTertiary, height: 1.7)),
+              style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.7)),
         ],
       ),
     );

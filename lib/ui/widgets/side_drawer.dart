@@ -1,16 +1,26 @@
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/model_provider.dart';
 import 'model_sheet.dart';
+import 'settings_dialog.dart';
 import 'top_bar_icons.dart';
 
 /// 左侧滑动抽屉（全局，挂在各 Shell 子屏的 Scaffold 上）。
+///
+/// [embedded] = true 时（桌面端宽屏）：不包 [Drawer] 遮罩，直接返回内容本体，
+/// 由 [MainShell] 以常驻侧栏形式放在 [Row] 左侧常驻显示；点击导航项不再 pop（无抽屉可关）。
+/// [embedded] = false 时（移动/窄屏）：保持原 overlay [Drawer] 行为。
 ///
 /// 千问式下拉刷新：
 /// - Drawer 内容整体跟手指下移（Transform.translate）
@@ -23,16 +33,25 @@ import 'top_bar_icons.dart';
 ///   新建对话 / 智能体 / 知识库 / 模型选择 / (个人中心)设置
 ///   历史对话（游标分页，今天·更早）
 class SideDrawer extends ConsumerStatefulWidget {
-  const SideDrawer({super.key});
+  final bool embedded;
+  const SideDrawer({super.key, this.embedded = false});
 
   @override
   ConsumerState<SideDrawer> createState() => _SideDrawerState();
 }
 
 class _SideDrawerState extends ConsumerState<SideDrawer>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   /// 抽屉滚动控制器。
   final ScrollController _scrollController = ScrollController();
+
+  /// 多端实时同步轮询间隔：10s。「准实时」——其他设备新建的会话，本端最多
+  /// 10s 后自动出现；流量极小（只拉 summary，不含消息明细）。
+  static const Duration _pollInterval = Duration(seconds: 10);
+
+  /// 多端实时同步轮询定时器（应用在前台时运行；切后台由
+  /// [didChangeAppLifecycleState] 暂停，省流量）。
+  Timer? _pollTimer;
 
   /// 抽屉是否处于「搜索模式」（点头部搜索 icon 进入；点取消退出）。
   /// 搜索模式下整抽屉切到 iOS 风搜索视图：顶栏变圆角胶囊+取消，
@@ -44,6 +63,12 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+
+  /// 历史对话"客户端虚拟分页"——后端不分页（一次返回 30 条），所以抽屉内自己
+  /// 按 [kHistoryPageSize] 一批一批渲染；下滑到底部 +15，UI 上自动扩展。
+  static const int kHistoryPageSize = 15;
+  int _historyShown = kHistoryPageSize;
+  bool _historyLoadingMore = false;
 
   /// snap-back 动画驱动器（drawer 抽屉松手后回归原位的缓动）。
   late final AnimationController _snapController;
@@ -82,6 +107,8 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     // 直到列表溢出或没有更多，避免历史被分页"卡住"需要手动操作。
     // 仅当本次加载确实新增了条目才继续级联，防止服务端异常返回相同数据导致死循环。
     ref.listenManual<ChatState>(chatControllerProvider, (prev, next) {
+      // 1) 短列表级联加载（现有逻辑）：本次加载新增了条目且服务端仍有更多、
+      //    且列表未溢出，自动再拉一页直到溢出或没有更多。
       if (prev?.sessionsLoading == true &&
           next.sessionsLoading == false &&
           (next.sessions.length > (prev?.sessions.length ?? 0)) &&
@@ -93,15 +120,56 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
           if (mounted) ref.read(chatControllerProvider.notifier).loadSessions();
         });
       }
+      // 2) 实时同步历史（新增）：当前会话 id 变化（新建 / 切换到别的会话 /
+      //    流式首帧回填 chatSessionId）时，自动刷新列表，让抽屉立刻反映最新
+      //    数据，无需手动下拉。
+      final prevId = prev?.sessionId;
+      final nextId = next.sessionId;
+      if (prevId != nextId && nextId != null && nextId.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _safeRefresh();
+        });
+      }
     });
     // 首次进入抽屉默认拉取一次历史会话
-    Future.microtask(
-      () => ref.read(chatControllerProvider.notifier).loadSessions(refresh: true),
-    );
+    Future.microtask(() => _safeRefresh());
+    // 注册生命周期监听：App 从后台 / 窗口失焦重新回到前台时，自动拉一次
+    // 最新历史（桌面端常驻抽屉只 mount 一次，这条是"实时看到新数据"的关键兜底）。
+    WidgetsBinding.instance.addObserver(this);
+    // 多端实时同步：周期性静默轮询历史列表，让其他设备新建的会话在本端自动
+    // 出现。轮询走 pollSessions（无 loading 圈、无变化不刷新 UI，不闪烁）。
+    _pollTimer = Timer.periodic(_pollInterval, (_) => _safePoll());
+  }
+
+  /// 安全刷新历史列表（mounted 守卫，避免异步回调里 setState 报错）。
+  void _safeRefresh() {
+    if (!mounted) return;
+    ref.read(chatControllerProvider.notifier).loadSessions(refresh: true);
+  }
+
+  /// 静默轮询（无 loading 圈、无变化不刷新 UI）：用于多端实时同步。
+  void _safePoll() {
+    if (!mounted) return;
+    ref.read(chatControllerProvider.notifier).pollSessions();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 回到前台 / 窗口重新聚焦：立即拉一次最新历史，并恢复轮询。
+      _safeRefresh();
+      _pollTimer ??= Timer.periodic(_pollInterval, (_) => _safePoll());
+    } else if (state == AppLifecycleState.paused) {
+      // 切到后台：暂停轮询，省流量。
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
   }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _snapController.dispose();
     _scrollController.dispose();
     _searchController.dispose();
@@ -135,12 +203,35 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
     final chat = ref.read(chatControllerProvider);
-    // 内容可滚动且接近底部：自动加载下一页（无限滚动）
-    if (pos.maxScrollExtent > 0 &&
-        pos.pixels >= pos.maxScrollExtent - 80 &&
-        chat.hasMore &&
-        !chat.sessionsLoading &&
-        chat.sessions.isNotEmpty) {
+    // 内容可滚动且接近底部：客户端虚拟分页：把"下一批 +kHistoryPageSize"
+    // 渲染到历史列表（不依赖后端分页）。
+    // 阈值放到 300px：让"快滚到底时"提前触发，避免手抖停在 90px 位置时
+    // 用户没意识到已经在自动加载；同时 `_historyLoadingMore` 互斥防抖。
+    final reachedBottom = pos.maxScrollExtent > 0 &&
+        pos.pixels >= pos.maxScrollExtent - 300;
+    if (!reachedBottom) return;
+    if (chat.sessions.isEmpty) return;
+
+    // 路径 A：客户端还有未渲染的（_historyShown < sessions.length）
+    //   —— 直接 +pageSize 渲染更多。
+    // 路径 B：客户端已渲染完，聊天状态里还有 hasMore=true —— 触发后端翻页。
+    // 路径 C：都没了 —— footer "已全部加载" 自然显示，无需处理。
+    if (_historyShown < chat.sessions.length) {
+      if (_historyLoadingMore) return;
+      setState(() => _historyLoadingMore = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _historyShown =
+              (_historyShown + kHistoryPageSize).clamp(0, chat.sessions.length);
+          _historyLoadingMore = false;
+        });
+      });
+      return;
+    }
+
+    // 客户端已渲染完；尝试后端翻页。
+    if (chat.hasMore && !chat.sessionsLoading) {
       ref.read(chatControllerProvider.notifier).loadSessions();
     }
   }
@@ -169,7 +260,7 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
 
   void _nav(String path, {bool push = false}) {
     final router = GoRouter.of(context);
-    Navigator.pop(context);
+    if (!widget.embedded) Navigator.pop(context);
     if (push) {
       router.push(path);
     } else {
@@ -187,76 +278,84 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     // loading 圈显示条件：刷新中 或 下拉到一定距离
     final showLoading = chat.sessionsLoading || (_pulling && _dragDy > 16);
 
+    final drawerContent = Stack(
+      children: [
+        // 抽屉整体跟手指下移；顶部 80px 手势触发区放在 inner Stack 里覆盖 ListView
+        Transform.translate(
+          offset: Offset(0, _dragDy),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: _handleScroll,
+                    child: ListView(
+                      controller: _scrollController,
+                      // AlwaysScrollableScrollPhysics：即便内容没溢出也允许顶部 overscroll，
+                      // 保证短列表下拉刷新同样能触发
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.zero,
+                      children: [
+                        // 头部：搜索模式 = iOS 风圆角胶囊+取消；普通模式 = logo+搜索 icon
+                        if (_searching)
+                          _buildSearchHeader()
+                        else
+                          _buildDrawerHeader(),
+                        // body：搜索模式 = 匹配结果；普通模式 = 新建对话 + 功能项 + 历史列表
+                        if (!_searching) ...[
+                          _buildNewChat(),
+                          _buildFeatures(selectedModel),
+                          _buildHistory(chat),
+                        ] else
+                          _buildSearchResults(chat),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildAccountEntry(auth),
+              ],
+            ),
+          ),
+        ),
+        if (showLoading)
+          Positioned(
+            top: mq.padding.top + 8,
+            left: 0,
+            right: 0,
+            height: 28,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    // 桌面端宽屏：常驻左侧栏（不遮罩），固定宽 300；点击导航由 _nav 处理，不再 pop。
+    // 注意：原 Drawer 隐式提供 Material 祖先，去掉 Drawer 后必须自己包一层 Material，
+    // 否则下面的 InkWell / ListTile 都会报 "No Material widget found"。
+    if (widget.embedded) {
+      return Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SizedBox(width: 300, child: drawerContent),
+      );
+    }
+
     return Drawer(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       // 抽屉宽度：移动端按屏宽 78%，桌面/平板上限 300（参考 DeepSeek 的紧凑窄抽屉）。
       // 上限避免宽屏（1920+）下抽屉被拉成 ~1497 的巨宽，列表行也跟着过宽不好读。
       width: () {
         final w = mq.size.width * 0.78;
         return w > 300 ? 300.0 : w;
       }(),
-      child: Stack(
-        children: [
-          // 1) 抽屉整体跟手指下移；顶部 80px 手势触发区放在 inner Stack 里覆盖 ListView
-          Transform.translate(
-            offset: Offset(0, _dragDy),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: _handleScroll,
-                      child: ListView(
-                        controller: _scrollController,
-                        // AlwaysScrollableScrollPhysics：即便内容没溢出也允许顶部 overscroll，
-                        // 保证短列表下拉刷新同样能触发
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: EdgeInsets.zero,
-                        children: [
-                          // 头部：搜索模式 = iOS 风圆角胶囊+取消；普通模式 = logo+搜索 icon
-                          if (_searching)
-                            _buildSearchHeader()
-                          else
-                            _buildDrawerHeader(),
-                          // body：搜索模式 = 匹配结果；普通模式 = 新建对话 + 功能项 + 历史列表
-                          if (!_searching) ...[
-                            _buildNewChat(),
-                            _buildFeatures(selectedModel),
-                            _buildHistory(chat),
-                          ] else
-                            _buildSearchResults(chat),
-                        ],
-                      ),
-                    ),
-                  ),
-                  _buildAccountEntry(auth),
-                ],
-              ),
-            ),
-          ),
-          // 2) 千问风 loading 转圈：钉在 SafeArea padding 之内的顶部位置；
-          //    drawer 整体被 Transform.translate 下移时，这条 Positioned 不会被
-          //    一起下移，因此视觉上"留在抽屉原顶部之外"那块新出现的空白处——
-          //    这就是用户想要的"千问直接下拉抽屉、空白处出现 loading 圈"。
-          if (showLoading)
-            Positioned(
-              top: mq.padding.top + 8,
-              left: 0,
-              right: 0,
-              height: 28,
-              child: const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      child: drawerContent,
     );
   }
 
@@ -480,7 +579,7 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         child: OutlinedButton.icon(
           onPressed: () {
             final router = GoRouter.of(context);
-            Navigator.pop(context);
+            if (!widget.embedded) Navigator.pop(context);
             router.go('/chat');
             ref.read(chatControllerProvider.notifier).newChat();
           },
@@ -542,95 +641,77 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     );
   }
 
-  /// 抽屉底部的「个人中心」入口（千问式资料块）：头像 + 昵称 + 箭头，点击进入个人中心。
+  /// 抽屉底部的「个人中心」入口：圆形头像（取 [AuthState.displayName] 首字）+
+  /// 昵称 + 设置图标（[assets/icons/settings.svg]），整行可点击。
+  /// 桌面端（embedded = true）走 master-detail：直接 anchor 到账号管理；
+  /// 移动端 [MeScreen] 全屏 push 转场。
   Widget _buildAccountEntry(AuthState auth) {
-    final name = auth.displayName;
-    final title = auth.isLoggedIn ? (name.isEmpty ? '已登录' : name) : '未登录';
-
-    return InkWell(
-      onTap: () {
-        // 千问风：从右往左滑入全屏个人中心；
-        // 不关闭抽屉（保留子屏 Scaffold 的抽屉 open 状态），
-        // 退回首页后抽屉自动保持打开。
-        GoRouter.of(context).push('/me');
-      },
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-        // 参考千问 / DeepSeek：底部「个人中心」用浅灰背景与上方列表区分
-        decoration: const BoxDecoration(
-          color: AppColors.surfaceMuted,
-          border: Border(top: BorderSide(color: AppColors.divider)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF4F7DF9),
-                        Color(0xFF8B5CF6),
-                        Color(0xFFA855F7),
-                      ],
-                    ),
-                    shape: BoxShape.circle,
+    final scheme = Theme.of(context).colorScheme;
+    final name = auth.displayName.isEmpty ? '未登录' : auth.displayName;
+    final initial = name.characters.first;
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (isDesktop(context)) {
+            // 桌面端：仿 WorkBuddy 弹出"设置"弹层（左侧 11 个分类 + 右侧内容）。
+            // 抽屉自身在弹层显示期间保持打开（不是路由跳转），关掉弹层即退出，
+            // 最大化减少界面跳转带来的"重置感"。
+            SettingsDialog.show(context);
+          } else {
+            // 移动端：全屏 push 个人中心（MeScreen），不再弹桌面 720px 弹窗，
+            // 杜绝「桌面布局泄漏到 APP 端」。
+            _nav('/me', push: true);
+          }
+        },
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // 圆形头像：取 displayName 首字（无网络依赖，离线/无头像也好看）。
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: scheme.primary,
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    color: scheme.onPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    name.isNotEmpty ? name[0] : '铁',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const Icon(Icons.chevron_right,
-                    size: 16, color: AppColors.textTertiary),
-              ],
-            ),
-            if (auth.isLoggedIn && auth.profileError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 40),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline,
-                        size: 13, color: AppColors.textTertiary),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        '资料未加载：${auth.profileError}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textTertiary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-          ],
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              // 工具栏风格：单色灰调 SVG（用 ColorFiltered 把原色统一到 onSurfaceVariant），
+              // 与 ListTile 视觉对齐；"设置"二字放进 Tooltip，节省横向空间。
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  scheme.onSurfaceVariant,
+                  BlendMode.srcIn,
+                ),
+                child: SvgPicture.asset(
+                  'assets/icons/settings.svg',
+                  width: 20,
+                  height: 20,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -639,13 +720,16 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
   Widget _buildHistory(ChatState chat) {
     // 排序在 provider 提交前完成（_sortSessions：去重 + createTime 倒序 + sessionId 兜底 + title 兜底），
     // 这里直接消费 state.sessions，不再二次排序，避免双重排序逻辑不一致导致乱序。
+    // 客户端虚拟分页：只渲染前 [_historyShown] 条（详情见 [_onScroll]）。
     final sessions = chat.sessions;
+    final visible = sessions.take(_historyShown).toList();
+    final hasMoreLocal = sessions.length > _historyShown;
 
     final today = <SessionSummary>[];
     final earlier = <SessionSummary>[];
     final now = DateTime.now();
 
-    for (final session in sessions) {
+    for (final session in visible) {
       final time = _parseTime(session.createTime);
       if (time != null &&
           time.year == now.year &&
@@ -691,9 +775,9 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
             (s) => _sessionTile(s, selected: s.sessionId == chat.sessionId),
           ),
         ],
-        // 自动加载更多：滚到底部由 _onScroll 触发 loadSessions()；
-        // 这里仅在有更多且正在加载时展示一个轻量进度提示（不再用「加载更多」手动按钮）
-        if (chat.hasMore && chat.sessionsLoading)
+        // 自动滚动到底部时由 [_onScroll] 客户端虚拟分页；这里不再展示
+        // 「加载更多」按钮（已隐藏），仅在没有更多时显示一个轻量 footer。
+        if (_historyLoadingMore)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
             child: Center(
@@ -702,18 +786,22 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.primary),
                 ),
               ),
             ),
-          ),
-        if (!chat.hasMore && sessions.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
+          )
+        else if (!hasMoreLocal && sessions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: Text(
-                '没有更多了',
-                style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary),
+                '— 已全部加载 · 共 ${sessions.length} 条 —',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ),
@@ -726,12 +814,16 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+        style: TextStyle(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
 
   Widget _sessionTile(SessionSummary session, {required bool selected}) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -743,14 +835,14 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: 13.5,
-          color: selected ? AppColors.primary : AppColors.textPrimary,
+          color: selected ? scheme.primary : scheme.onSurface,
           fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
       onTap: () {
         // 1) 切换到该历史会话；2) 关抽屉；3) 路由回 /chat 让对话屏展示历史占位。
         ref.read(chatControllerProvider.notifier).openSession(session.sessionId);
-        Navigator.pop(context);
+        if (!widget.embedded) Navigator.pop(context);
         GoRouter.of(context).go('/chat');
       },
     );
@@ -762,6 +854,7 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     required VoidCallback onTap,
     String? trailing,
   }) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -769,10 +862,10 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
       horizontalTitleGap: 10,
       // leading 强制最少占 0，避免被 ListTile 自动撑到 40 让真实 icon 显得很挤
       minLeadingWidth: 0,
-      leading: Icon(icon, size: 19, color: AppColors.textPrimary),
+      leading: Icon(icon, size: 19, color: scheme.onSurface),
       title: Text(
         label,
-        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
+        style: TextStyle(fontSize: 14, color: scheme.onSurface),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -780,13 +873,14 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
           if (trailing != null)
             Text(
               trailing,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11.5,
-                color: AppColors.textTertiary,
+                color: scheme.onSurfaceVariant,
               ),
             ),
           const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, size: 16, color: AppColors.textTertiary),
+          Icon(Icons.chevron_right,
+              size: 16, color: scheme.onSurfaceVariant),
         ],
       ),
       onTap: onTap,

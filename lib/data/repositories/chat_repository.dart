@@ -74,11 +74,21 @@ class ChatRepository {
   /// **不要传 `cursor`**——带上 cursor 后端会据此返回翻页窗口而非完整首页，
   /// 导致 app 端列表顺序与 Postman / web 不一致（表现为「错乱」）。
   /// 后端按自身默认排序返回，顺序即权威顺序，客户端原样展示即可。
-  Future<SessionPage> fetchSessions({int limit = 30}) async {
+  ///
+  /// [limit] 默认 100（前后端经验的折中值）：Web 端单页 30 对 app 端抽屉不够（实测
+  /// 长列表用户下滑接近底部时已无法触发更多）；100 既能覆盖大多数会话场景，又
+  /// 不至于一次拉回几千条把抽屉渲染卡爆。极端长会话走后端"按时间分组"展示，
+  /// 不在前端无限下拉的范围内。
+  Future<SessionPage> fetchSessions({int limit = 100, String? cursor}) async {
     final body = <String, dynamic>{
       'filter': '',
       'limit': limit,
     };
+    // cursor 不再使用（见上方注释）；保留参数签名以便未来若后端修正
+    // 翻页契约，可直接复用本方法。
+    if (cursor != null && cursor.isNotEmpty) {
+      body['cursor'] = cursor;
+    }
     final data = await _api.post<Map<String, dynamic>>(
       '/ai/chat/his/record/list',
       body: body,

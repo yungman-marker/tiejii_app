@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/responsive.dart';
 import '../providers/auth_provider.dart';
 import '../ui/screens/agent_center_screen.dart';
 import '../ui/screens/agent_detail_screen.dart';
@@ -13,12 +14,14 @@ import '../ui/screens/kb_search_screen.dart';
 import '../ui/screens/knowledge_screen.dart';
 import '../ui/screens/knowledge_dir_screen.dart';
 import '../ui/screens/file_preview_screen.dart';
+import '../ui/screens/appearance_screen.dart';
 import '../ui/screens/login_screen.dart';
 import '../ui/screens/main_shell.dart';
 import '../ui/screens/memory_screen.dart';
 import '../ui/screens/me_screen.dart';
 import '../ui/screens/privacy_screen.dart';
 import '../ui/screens/settings_screen.dart';
+
 
 /// 应用路由
 ///
@@ -45,6 +48,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final loc = state.matchedLocation;
       final atLogin = loc == '/login';
+
+      // 桌面端首次进入 /me：直接 anchor 到第一个子菜单 /me/settings（账号管理）
+      // 避免 master-detail 容器里同时展示原 MeScreen 的 5 段菜单，与中间
+      // 240px 的 _Sidebar 导航菜单视觉重叠。窄屏（移动端）保持原 /me 全屏
+      // push 行为不变。
+      if (isLoggedIn && loc == '/me' && isDesktop(context)) {
+        return '/me/settings';
+      }
+
       if (!isLoggedIn && !atLogin) return '/login';
       if (isLoggedIn && atLogin) return '/chat';
       return null;
@@ -54,7 +66,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
-      // 已登录主框架（3 Tab）
+      // 已登录主框架（3 Tab + /me 区域）。
+      // /me 放在 ShellRoute 内，让桌面端 MainShell 能根据 matchedLocation 把它
+      // 包装成 master-detail 容器（MeShellDesktop）；移动端 MainShell 只是
+      // Scaffold(body: child)，所以 /me 仍然呈现为「全屏 push」效果，
+      // 但 pageBuilder 里继续用 _slidePage 保留从右滑入转场。
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
@@ -71,32 +87,53 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: KnowledgeScreen()),
           ),
-        ],
-      ),
-      // 抽屉 push 出来的页面（覆盖底栏），千问风：从右往左滑入。
-      GoRoute(
-        path: '/me',
-        pageBuilder: (context, state) => _slidePage(const MeScreen()),
-        routes: [
+          // /me 及其子页：全部拍平到 ShellRoute 同级（不要用 nested routes +
+          // pageBuilder，因为 go_router 14.x 在 ShellRoute + 嵌套 pageBuilder
+          // 的组合下，会出现"父 pageBuilder 锁住 child、子路由生效但
+          // shell.child 仍是父 widget"的 bug）。
+          // 每个 /me/* 都是独立 pageBuilder，路由切换时 shell.child 必然是
+          // 对应的子 widget。
           GoRoute(
-            path: 'settings',
-            pageBuilder: (context, state) => _slidePage(const SettingsScreen()),
+            path: '/me',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: MeScreen())
+                : _slidePage(const MeScreen()),
           ),
           GoRoute(
-            path: 'data',
-            pageBuilder: (context, state) => _slidePage(const DataManagementScreen()),
+            path: '/me/settings',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: SettingsScreen())
+                : _slidePage(const SettingsScreen()),
           ),
           GoRoute(
-            path: 'privacy',
-            pageBuilder: (context, state) => _slidePage(const PrivacyScreen()),
+            path: '/me/data',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: DataManagementScreen())
+                : _slidePage(const DataManagementScreen()),
           ),
           GoRoute(
-            path: 'memory',
-            pageBuilder: (context, state) => _slidePage(const MemoryScreen()),
+            path: '/me/privacy',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: PrivacyScreen())
+                : _slidePage(const PrivacyScreen()),
           ),
           GoRoute(
-            path: 'feedback',
-            pageBuilder: (context, state) => _slidePage(const FeedbackScreen()),
+            path: '/me/memory',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: MemoryScreen())
+                : _slidePage(const MemoryScreen()),
+          ),
+          GoRoute(
+            path: '/me/appearance',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: AppearanceScreen())
+                : _slidePage(const AppearanceScreen()),
+          ),
+          GoRoute(
+            path: '/me/feedback',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: FeedbackScreen())
+                : _slidePage(const FeedbackScreen()),
           ),
         ],
       ),

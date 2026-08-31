@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 允许访问内网 http 后端。仅对本域名放开明文流量，其余仍走 https。 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">kygl-crcc-tj-ai-front-vue.test.cdcgy-gw.com</domain>
+    </domain-config>
+</network-security-config>

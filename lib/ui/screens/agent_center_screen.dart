@@ -7,6 +7,7 @@ import '../../data/models/models.dart';
 import '../../providers/agent_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../widgets/side_drawer.dart';
+import '../../core/responsive.dart';
 import '../widgets/top_bar_action_button.dart';
 import '../widgets/top_bar_icons.dart';
 
@@ -33,48 +34,55 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(agentControllerProvider);
+    final isWide = isDesktop(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      drawer: const SideDrawer(),
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _header(),
-            const SizedBox(height: 8),
+      drawer: isWide ? null : const SideDrawer(),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _header(isWide),
+            SizedBox(height: 8),
             _segments(state.segment),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Expanded(child: _body(state)),
           ],
+        ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _header() {
+  Widget _header(bool isWide) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
       child: Row(
         children: [
-          Builder(
-            builder: (ctx) => Padding(
-              padding: const EdgeInsets.only(left: 4),
-                child: TopBarActionButton(
-                tooltip: '菜单',
-                icon: TopBarIcons.menu(),
-                onPressed: () {
-                  Scaffold.of(ctx).openDrawer();
-                  if (ref.read(chatControllerProvider).sessions.isEmpty) {
-                    ref
-                        .read(chatControllerProvider.notifier)
-                        .loadSessions(refresh: true);
-                  }
-                },
-              ),
-            ),
-          ),
-          const Expanded(
+          isWide
+              ? const SizedBox.shrink()
+              : Builder(
+                  builder: (ctx) => Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: TopBarActionButton(
+                      tooltip: '菜单',
+                      icon: TopBarIcons.menu(),
+                      onPressed: () {
+                        Scaffold.of(ctx).openDrawer();
+                        if (ref.read(chatControllerProvider).sessions.isEmpty) {
+                          ref
+                              .read(chatControllerProvider.notifier)
+                              .loadSessions(refresh: true);
+                        }
+                      },
+                    ),
+                  ),
+                ),
+          Expanded(
             child: Center(
               child: Text('智能中心',
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
@@ -84,7 +92,7 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
             padding: const EdgeInsets.only(right: 12, left: 4),
             child: TopBarActionButton(
               tooltip: '创建智能体',
-              icon: const Icon(Icons.add, size: 20, color: AppColors.textPrimary),
+              icon: Icon(Icons.add, size: 20, color: Theme.of(context).colorScheme.onSurface),
               onPressed: () => _tip('创建智能体：待后端开放'),
             ),
           ),
@@ -100,7 +108,7 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: AppColors.surfaceMuted,
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(11),
         ),
         child: Row(
@@ -126,7 +134,7 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: on ? AppColors.primary : AppColors.textSecondary,
+                      color: on ? AppColors.primary : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -140,7 +148,7 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
 
   Widget _body(AgentState state) {
     if (state.loading) {
-      return const Center(
+      return Center(
           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary));
     }
     if (state.error != null) {
@@ -165,12 +173,13 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
       );
     }
 
+    final isWide = isDesktop(context);
     return RefreshIndicator(
       onRefresh: () => ref.read(agentControllerProvider.notifier).load(),
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isWide ? 3 : 2,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           // 158宽 → 150高 = 1.05，刚好贴合"内容最大自然高 ≈ 143dp"，
@@ -223,15 +232,15 @@ class _AgentCenterScreenState extends ConsumerState<AgentCenterScreen> {
                 ),
                 child: Icon(icon, size: 28, color: AppColors.primary),
               ),
-              const SizedBox(height: 12),
-              Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
+              SizedBox(height: 12),
+              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              SizedBox(height: 6),
               Text(desc,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.textTertiary, height: 1.6)),
+                  style: TextStyle(fontSize: 11.5, color: Theme.of(context).colorScheme.onSurfaceVariant, height: 1.6)),
               if (onRetry != null) ...[
-                const SizedBox(height: 14),
-                TextButton(onPressed: onRetry, child: const Text('重试')),
+                SizedBox(height: 14),
+                TextButton(onPressed: onRetry, child: Text('重试')),
               ],
             ],
           ),
@@ -252,7 +261,7 @@ class _AgentCard extends StatelessWidget {
     final contactLine = _contactLine();
 
     return Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -262,7 +271,7 @@ class _AgentCard extends StatelessWidget {
           padding: const EdgeInsets.all(11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.divider, width: 0.5),
+            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 0.5),
             boxShadow: const [
               BoxShadow(color: Color(0x0A0F172A), blurRadius: 6, offset: Offset(0, 2)),
             ],
@@ -276,8 +285,8 @@ class _AgentCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _avatar(),
-                  const SizedBox(width: 9),
+                  _avatar(context),
+                  SizedBox(width: 9),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,19 +301,19 @@ class _AgentCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                             color: skill.name.isEmpty
                                 ? AppColors.danger
-                                : AppColors.textPrimary,
+                                : Theme.of(context).colorScheme.onSurface,
                             height: 1.15,
                           ),
                         ),
                         if (chips.isNotEmpty) ...[
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             chips.take(2).map((c) => c.label).join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10,
-                              color: AppColors.textTertiary,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.w500,
                               height: 1.15,
                             ),
@@ -313,8 +322,8 @@ class _AgentCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  _interactions(),
+                  SizedBox(width: 4),
+                  _interactions(context),
                 ],
               ),
 
@@ -327,14 +336,14 @@ class _AgentCard extends StatelessWidget {
                 skill.description.isEmpty ? '暂无描述' : skill.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.45,
                 ),
               ),
 
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
 
               // ── 底部：联系人 · 单位 / N 人用过 ──
               Row(
@@ -344,19 +353,19 @@ class _AgentCard extends StatelessWidget {
                       contactLine,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textTertiary,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
                   if (skill.useCount > 0) ...[
-                    const Icon(Icons.bar_chart_outlined,
-                        size: 10.5, color: AppColors.textTertiary),
-                    const SizedBox(width: 2),
+                    Icon(Icons.bar_chart_outlined,
+                        size: 10.5, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    SizedBox(width: 2),
                     Text('${skill.useCount} 人用过',
-                        style: const TextStyle(
-                            fontSize: 10, color: AppColors.textTertiary)),
+                        style: TextStyle(
+                            fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ],
               ),
@@ -369,7 +378,7 @@ class _AgentCard extends StatelessWidget {
                     '⚠️ ${skill.debugKeys}',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 9.5, color: AppColors.danger, height: 1.3),
                   ),
                 ),
@@ -409,37 +418,37 @@ class _AgentCard extends StatelessWidget {
 
   // ===== 子组件 =====
 
-  Widget _avatar() {
+  Widget _avatar(BuildContext context) {
     final url = skill.displayIcon;
     final hasImg = url != null && url.isNotEmpty;
     return Container(
       width: 36, height: 36,
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.divider, width: 0.5),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant, width: 0.5),
       ),
       clipBehavior: Clip.antiAlias,
       child: hasImg
           ? Image.network(url,
               width: 36, height: 36, fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _initialFallback())
-          : _initialFallback(),
+              errorBuilder: (_, __, ___) => _initialFallback(context))
+          : _initialFallback(context),
     );
   }
 
-  Widget _initialFallback() {
+  Widget _initialFallback(BuildContext context) {
     final ch = skill.name.isNotEmpty ? skill.name[0] : '?';
     return Center(
       child: Text(ch,
-          style: const TextStyle(
-              color: AppColors.textSecondary,
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 15,
               fontWeight: FontWeight.w700)),
     );
   }
 
-  Widget _chip(String label, bool soft) {
+  Widget _chip(BuildContext context, String label, bool soft) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
       decoration: BoxDecoration(
@@ -450,7 +459,7 @@ class _AgentCard extends StatelessWidget {
         label,
         style: TextStyle(
           fontSize: 9.5,
-          color: soft ? AppColors.primary : AppColors.textSecondary,
+          color: soft ? AppColors.primary : Theme.of(context).colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w600,
           height: 1.2,
         ),
@@ -459,7 +468,7 @@ class _AgentCard extends StatelessWidget {
   }
 
   /// 右上角：点赞数 + 收藏小标。
-  Widget _interactions() {
+  Widget _interactions(BuildContext context) {
     final liked = skill.liked;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -467,18 +476,18 @@ class _AgentCard extends StatelessWidget {
         Icon(
           liked ? Icons.thumb_up : Icons.thumb_up_outlined,
           size: 12,
-          color: liked ? AppColors.primary : AppColors.textTertiary,
+          color: liked ? AppColors.primary : Theme.of(context).colorScheme.onSurfaceVariant,
         ),
-        const SizedBox(width: 2),
+        SizedBox(width: 2),
         Text('${skill.likeCount}',
             style: TextStyle(
               fontSize: 10,
-              color: liked ? AppColors.primary : AppColors.textTertiary,
+              color: liked ? AppColors.primary : Theme.of(context).colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             )),
         if (skill.favorite) ...[
-          const SizedBox(width: 6),
-          const Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFC107)),
+          SizedBox(width: 6),
+          Icon(Icons.star_rounded, size: 12, color: Color(0xFFFFC107)),
         ],
       ],
     );

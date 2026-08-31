@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/models.dart';
 import '../../providers/feedback_provider.dart';
@@ -34,14 +35,16 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(feedbackControllerProvider);
+    final isWide = isDesktop(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+        leading: isWide
+            ? const SizedBox.shrink()
+            : IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+                onPressed: () => context.pop(),
+              ),
         title: const Text('意见反馈'),
         centerTitle: true,
       ),
@@ -125,9 +128,10 @@ class _Segments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final labels = ['我要反馈', '意见回复'];
     return Container(
-      color: Colors.white,
+      color: scheme.surface,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       child: Row(
         children: List.generate(labels.length, (i) {
@@ -148,17 +152,17 @@ class _Segments extends StatelessWidget {
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: on
-                                ? AppColors.textPrimary
-                                : AppColors.textTertiary,
+                                ? scheme.onSurface
+                                : scheme.onSurfaceVariant,
                           ),
                         ),
                         if (i == 1 && replyCount > 0)
                           Padding(
                             padding: const EdgeInsets.only(left: 4),
                             child: Text('($replyCount)',
-                                style: const TextStyle(
+                                style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.danger,
+                                    color: scheme.error,
                                     fontWeight: FontWeight.w700)),
                           ),
                       ],
@@ -168,7 +172,7 @@ class _Segments extends StatelessWidget {
                     height: 2.5,
                     width: 22,
                     decoration: BoxDecoration(
-                      color: on ? AppColors.primary : Colors.transparent,
+                      color: on ? scheme.primary : Colors.transparent,
                       borderRadius: BorderRadius.circular(1.5),
                     ),
                   ),
@@ -298,18 +302,21 @@ class _SubmitFormState extends State<_SubmitForm> {
   }
 
   Widget _ratingCard() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         children: [
-          const Text('系统使用体验如何？',
+          Text('系统使用体验如何？',
               style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface)),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -325,7 +332,7 @@ class _SubmitFormState extends State<_SubmitForm> {
                     size: 30,
                     color: filled
                         ? const Color(0xFFF59E0B)
-                        : AppColors.textTertiary,
+                        : scheme.onSurfaceVariant,
                   ),
                 ),
               );
@@ -333,28 +340,32 @@ class _SubmitFormState extends State<_SubmitForm> {
           ),
           const SizedBox(height: 8),
           Text(_ratingText,
-              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
+              style: TextStyle(
+                  fontSize: 12, color: scheme.onSurfaceVariant)),
         ],
       ),
     );
   }
 
   Widget _contentCard() {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8, left: 2),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8, left: 2),
             child: Text('问题类型',
                 style: TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600)),
           ),
           Wrap(
             spacing: 8,
@@ -368,20 +379,22 @@ class _SubmitFormState extends State<_SubmitForm> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: selected ? AppColors.primary : AppColors.background,
+                    color: selected
+                        ? scheme.primary
+                        : scheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                         color: selected
-                            ? AppColors.primary
-                            : AppColors.border),
+                            ? scheme.primary
+                            : scheme.outline),
                   ),
                   child: Text(t,
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: selected
-                              ? Colors.white
-                              : AppColors.textPrimary)),
+                              ? scheme.onPrimary
+                              : scheme.onSurface)),
                 ),
               );
             }).toList(),
@@ -391,12 +404,13 @@ class _SubmitFormState extends State<_SubmitForm> {
             controller: _contentCtrl,
             minLines: 3,
             maxLines: 5,
+            style: TextStyle(color: scheme.onSurface),
             decoration: InputDecoration(
               hintText: '欢迎说说你想法…\n例如：希望知识库搜索支持语音输入',
-              hintStyle: const TextStyle(
-                  color: AppColors.textTertiary, fontSize: 13, height: 1.5),
+              hintStyle: TextStyle(
+                  color: scheme.onSurfaceVariant, fontSize: 13, height: 1.5),
               filled: true,
-              fillColor: AppColors.background,
+              fillColor: scheme.surfaceContainerHighest,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
@@ -410,6 +424,7 @@ class _SubmitFormState extends State<_SubmitForm> {
   }
 
   Widget _imageCard() {
+    final scheme = Theme.of(context).colorScheme;
     return SizedBox(
       height: 72,
       child: ListView(
@@ -422,15 +437,15 @@ class _SubmitFormState extends State<_SubmitForm> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: scheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: AppColors.border,
+                    color: scheme.outline,
                     width: 1,
                     style: BorderStyle.solid),
               ),
-              child: const Icon(Icons.add,
-                  size: 26, color: AppColors.textTertiary),
+              child: Icon(Icons.add,
+                  size: 26, color: scheme.onSurfaceVariant),
             ),
           ),
           if (_image != null) ...[
@@ -443,6 +458,7 @@ class _SubmitFormState extends State<_SubmitForm> {
   }
 
   Widget _imageThumb(PickedFile f) {
+    final scheme = Theme.of(context).colorScheme;
     return Stack(
       children: [
         ClipRRect(
@@ -455,10 +471,10 @@ class _SubmitFormState extends State<_SubmitForm> {
             errorBuilder: (_, __, ___) => Container(
               width: 72,
               height: 72,
-              color: AppColors.background,
+              color: scheme.surfaceContainerHighest,
               alignment: Alignment.center,
-              child: const Icon(Icons.image_outlined,
-                  size: 24, color: AppColors.textTertiary),
+              child: Icon(Icons.image_outlined,
+                  size: 24, color: scheme.onSurfaceVariant),
             ),
           ),
         ),
@@ -470,12 +486,12 @@ class _SubmitFormState extends State<_SubmitForm> {
             child: Container(
               width: 20,
               height: 20,
-              decoration: const BoxDecoration(
-                color: AppColors.danger,
+              decoration: BoxDecoration(
+                color: scheme.error,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: const Icon(Icons.close, size: 12, color: Colors.white),
+              child: Icon(Icons.close, size: 12, color: scheme.onError),
             ),
           ),
         ),
@@ -557,20 +573,21 @@ class _ReplyList extends StatelessWidget {
       onRefresh: onRefresh,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
-        children: items.map(_card).toList(),
+        children: items.map((f) => _card(f, context)).toList(),
       ),
     );
   }
 
-  Widget _card(FeedbackItem f) {
+  Widget _card(FeedbackItem f, BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final answered = f.replied;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outline),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -582,44 +599,44 @@ class _ReplyList extends StatelessWidget {
               if (f.createTime != null) ...[
                 const SizedBox(width: 8),
                 Text(f.createTime!,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textTertiary)),
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant)),
               ],
               const Spacer(),
-              const Icon(Icons.chevron_right,
-                  size: 16, color: AppColors.textTertiary),
+              Icon(Icons.chevron_right,
+                  size: 16, color: scheme.onSurfaceVariant),
             ],
           ),
           const SizedBox(height: 8),
           Text(f.content,
-              style: const TextStyle(
-                  fontSize: 13, color: AppColors.textPrimary, height: 1.6)),
+              style: TextStyle(
+                  fontSize: 13, color: scheme.onSurface, height: 1.6)),
           if (answered && f.answer != null) ...[
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
+                  color: scheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    const Icon(Icons.support_agent,
+                    Icon(Icons.support_agent,
                         size: 13, color: AppColors.success),
                     const SizedBox(width: 4),
                     Text('官方回复 · ${f.replyTime ?? f.createTime ?? ''}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: AppColors.success)),
                   ]),
                   const SizedBox(height: 4),
                   Text(f.answer!,
-                      style: const TextStyle(
+                      style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: scheme.onSurfaceVariant,
                           height: 1.6)),
                 ],
               ),

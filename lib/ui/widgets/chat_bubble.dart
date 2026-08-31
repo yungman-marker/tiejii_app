@@ -43,24 +43,27 @@ class ChatBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Flexible(
-            child: isUser ? _buildUserBubble() : _buildAssistantBlock(),
+            child: isUser
+              ? _buildUserBubble(context)
+              : _buildAssistantBlock(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildUserBubble() {
+  Widget _buildUserBubble(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDF3FE),
+        color: scheme.primary,
         borderRadius: BorderRadius.circular(AppRadius.bubble),
       ),
       child: Text(
         message.content,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: scheme.onPrimary,
           fontSize: 15,
           height: 1.55,
         ),
@@ -68,36 +71,37 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildAssistantBlock() {
+  Widget _buildAssistantBlock(BuildContext context) {
     final streaming = message.status == MessageStatus.streaming;
     final waiting = streaming && message.content.isEmpty;
+    final scheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 思考过程（thinkEnable 时展示）
         if (message.thinking != null && message.thinking!.isNotEmpty)
-          _buildThinking(),
+          _buildThinking(context),
 
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: scheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppRadius.bubble),
           ),
           child: waiting
-              ? const Text(
+              ? Text(
                   '思考中…',
                   style: TextStyle(
-                    color: AppColors.textTertiary,
+                    color: scheme.onSurfaceVariant,
                     fontSize: 15,
                     height: 1.55,
                   ),
                 )
               : _renderMarkdown(
                   message.content,
-                  const TextStyle(
-                    color: AppColors.textPrimary,
+                  TextStyle(
+                    color: scheme.onSurface,
                     fontSize: 15,
                     height: 1.55,
                   ),
@@ -111,13 +115,13 @@ class ChatBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _ActionIcon(
-                icon: _svgIcon('assets/icons/copy.svg'),
+                icon: _svgIcon('assets/icons/copy.svg', color: scheme.onSurfaceVariant),
                 tooltip: '复制',
                 onTap: onCopy,
               ),
               const SizedBox(width: 4),
               _ActionIcon(
-                icon: _svgIcon('assets/icons/refresh.svg'),
+                icon: _svgIcon('assets/icons/refresh.svg', color: scheme.onSurfaceVariant),
                 tooltip: '重新生成',
                 onTap: onRegenerate,
               ),
@@ -125,13 +129,13 @@ class ChatBubble extends StatelessWidget {
               _ActionIcon(
                 icon: isPlaying
                     ? const _PlayingIcon()
-                    : _svgIcon('assets/icons/play.svg'),
+                    : _svgIcon('assets/icons/play.svg', color: scheme.onSurfaceVariant),
                 tooltip: isPlaying ? '停止朗读' : '朗读',
                 onTap: onRead,
               ),
               const SizedBox(width: 4),
               _ActionIcon(
-                icon: _svgIcon('assets/icons/share.svg'),
+                icon: _svgIcon('assets/icons/share.svg', color: scheme.onSurfaceVariant),
                 tooltip: '分享',
                 onTap: onShare,
               ),
@@ -142,33 +146,34 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
-  Widget _buildThinking() {
+  Widget _buildThinking(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
+        color: scheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '思考过程',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: scheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             message.thinking!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
-              color: AppColors.textSecondary,
+              color: scheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
@@ -214,13 +219,13 @@ class _ActionIcon extends StatelessWidget {
 }
 
 /// 单色 SVG 图标（着色为 textTertiary，16 尺寸）。
-Widget _svgIcon(String asset) {
+Widget _svgIcon(String asset, {Color? color}) {
   return SvgPicture.asset(
     asset,
     width: 16,
     height: 16,
     colorFilter:
-        const ColorFilter.mode(AppColors.textTertiary, BlendMode.srcIn),
+        ColorFilter.mode(color ?? AppColors.textTertiary, BlendMode.srcIn),
   );
 }
 

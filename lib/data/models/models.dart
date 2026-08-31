@@ -70,6 +70,7 @@ class ChatModel {
     required this.id,
     required this.code,
     required this.name,
+    this.isDefault,
     this.feeType = 'free',
     this.inputModel = const [],
     this.supportThinking = false,
@@ -82,6 +83,11 @@ class ChatModel {
         id: (json['id'] ?? '').toString(),
         code: (json['chatModelCode'] ?? '').toString(),
         name: (json['name'] ?? json['chatModelCode'] ?? '未命名模型').toString(),
+        // 后端 list 响应里每个模型都带 isDefault（0/1），
+        // 默认模型直接从这里挑，无需再调 getDefault（web 端就是这么干的）。
+        isDefault: json['isDefault'] is num
+            ? (json['isDefault'] as num).toInt()
+            : null,
         feeType: (json['feeType'] ?? 'free').toString(),
         inputModel: (json['inputModel'] as List<dynamic>? ?? const [])
             .map((e) => e.toString())
@@ -95,6 +101,8 @@ class ChatModel {
   final String id;
   final String code;
   final String name;
+  /// 后端 list 响应里的默认标记（1=默认模型）。web 端直接用此字段挑默认。
+  final int? isDefault;
   final String feeType;
   final List<String> inputModel;
   final bool supportThinking;

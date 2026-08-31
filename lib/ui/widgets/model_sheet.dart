@@ -87,6 +87,14 @@ class ModelSheet extends ConsumerWidget {
                     avail.status[model.id] ?? ModelAvailability.unknown,
                 reason: avail.reason[model.id],
                 onTap: () {
+                  // 用户主动切到某模型时，先清掉它的旧可用性痕迹（status/reason/notice），
+                  // 让这次对话有机会被重新判定（成功 → 绿点；失败 → 再标红）。
+                  // 否则过去因 Web SSE CORS 失败被错误标红的模型会一直挂着，
+                  // 即使桌面端实测可用也会显示「暂不可用」，与 UI 上「点击可重试」的
+                  // 文案自相矛盾。
+                  ref
+                      .read(modelAvailabilityProvider.notifier)
+                      .clear(model.id);
                   ref.read(modelControllerProvider.notifier).select(model.id);
                   ref.read(chatControllerProvider.notifier).setModel(model.id);
                   Navigator.pop(context);

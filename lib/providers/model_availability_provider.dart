@@ -86,6 +86,22 @@ class ModelAvailabilityController extends StateNotifier<ModelAvailabilityState> 
 
   /// 用户手动清除提示横幅。
   void clearNotice() => state = state.copyWith(clearNotice: true);
+
+  /// 清掉某模型的所有可用性痕迹（status / reason / 若 notice 是该模型也一并清）。
+  ///
+  /// 使用场景：用户在模型面板切换到一个"被标暂不可用"的模型时（实际可能是
+  /// 之前的网络/CORS 错误被错误标记），重置为 unknown，让下次对话有机会
+  /// 通过 markAvailable / markUnavailable 重新判定。
+  void clear(String id) {
+    final status = {...state.status}..remove(id);
+    final reason = {...state.reason}..remove(id);
+    final clearNotice = state.noticeModelId == id;
+    state = state.copyWith(
+      status: status,
+      reason: reason,
+      clearNotice: clearNotice,
+    );
+  }
 }
 
 final modelAvailabilityProvider =

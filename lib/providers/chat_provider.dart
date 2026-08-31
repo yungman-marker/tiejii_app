@@ -348,8 +348,13 @@ class ChatController extends StateNotifier<ChatState> {
   void _onError(Object error) {
     final id = state.modelId;
     final isAuth = error is ApiException && error.code == 401;
+    // 网络/CORS/超时/连接被拒 等环境层错误 → 不去污染模型可用性。
+    // 这些是 Web 平台的 CORS 限制（或 DNS/网络层）问题，不是模型本身的问题，
+    // 把它们标成「暂不可用」会冤枉本来能用的模型（已在桌面端验证可用的模型
+    // 在 Web 端因 SSE CORS 失败被错误标红）。错误详情仍通过 _fail 显示给用户。
+    final isNetwork = _isNetworkError(error);
     // 已经收到内容 → 仅清状态，不去污染 modelAvailability（避免"明明答案出来了还被标不可用"）
-    if (id != null && !isAuth && !_contentReceived) {
+    if (id != null && !isAuth && !isNetwork && !_contentReceived) {
       _ref.read(modelAvailabilityProvider.notifier).markUnavailable(
             id,
             reason: _describeError(error),
@@ -357,6 +362,18 @@ class ChatController extends StateNotifier<ChatState> {
           );
     }
     _fail(_describeError(error));
+  }
+
+  /// 判断是否为「网络/CORS 环境层」错误（不是模型本身的问题）。
+  /// 复用 [ApiException]/[TimeoutException] 的翻译规则，避免两套判定走偏。
+  bool _isNetworkError(Object error) {
+    if (error is TimeoutException) return true;
+    final raw = error.toString();
+    return raw.contains('Failed to fetch') ||
+        raw.contains('XMLHttpRequest') ||
+        raw.contains('SocketException') ||
+        raw.contains('Connection refused') ||
+        raw.contains('No address associated with hostname');
   }
 
   /// 把底层异常翻译为「给用户看的不可用原因 / 错误栏文案」。

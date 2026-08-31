@@ -47,6 +47,7 @@ flutter:
     - assets/icons/
     - assets/title.png
     - assets/login_bg.png
+    - assets/login_mobile_top.png  # 移动端登录页顶部图（仅 _buildMobile 使用，桌面端不变）
 
 msix_config:
   display_name: 铁骥大模型

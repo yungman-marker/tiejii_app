@@ -50,7 +50,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isWide = isDesktop(context);
 
     return Scaffold(
-      backgroundColor: _Light.bgPage,
+      // 桌面端保留原浅灰底（_Light.bgPage），移动端按用户要求改为透明 #00000000，
+      // 二者彻底解耦，改动不影响桌面端。
+      backgroundColor: isWide ? _Light.bgPage : Colors.transparent,
       body: isWide ? _buildDesktop(auth) : _buildMobile(auth),
     );
   }
@@ -94,10 +96,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildMobile(AuthState auth) {
     return Column(
       children: [
-        SizedBox(
-          height: 240,
-          width: double.infinity,
-          child: const _LoginBackground(),
+        // 移动端顶部图：与桌面端 _LoginBackground 完全解耦。
+        // 新素材 assets/login_mobile_top.png 原比例 602×396 ≈ 1.52:1，
+        // 用 AspectRatio 自适应屏宽、保持比例渲染；
+        // 桌面端代码（_LoginBackground / login_bg.png）完全不变。
+        AspectRatio(
+          aspectRatio: 602 / 396,
+          child: Image.asset(
+            'assets/login_mobile_top.png',
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(

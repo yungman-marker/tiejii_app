@@ -26,6 +26,17 @@
   <meta name="translate" content="no">
   <meta class="notranslate" content="notranslate">
 
+  <!-- 强制 HTML 渲染器（Flutter 3.47 已移除 --web-renderer flag，改用此全局变量）。
+       原因：云桌面访问不到外网 gstatic CDN，默认的 CanvasKit 渲染器会去拉
+       www.gstatic.com/flutter-canvaskit/canvaskit.js，拉不到直接白屏。
+       HTML 渲染器走 DOM/CSS，不依赖任何 CDN，本地 web 调试即可正常显示。
+       （iPhone 真机有外网，可正常拉 gstatic；此设置对真机 UI 验证也无影响） -->
+  <meta name="flutter-web-renderer" content="html">
+  <script>
+    // legacy 全局：多数 Flutter Web 版本在引擎初始化时读取此变量决定渲染器
+    window.flutterWebRenderer = 'html';
+  </script>
+
   <!-- 防御：禁用 Flutter Web 上输入区域（TextField 落地为 contenteditable）
        的浏览器拼写检查视觉装饰；普通 Text widget 的 Chrome 拼写下划线
        无法通过 CSS 关闭，但 notranslate meta 能挡住 Google 翻译引发的部分情况 -->
@@ -69,5 +80,18 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // 新 bootstrap 引导：通过 setupHook 在 initializeEngine 时强制 html 渲染器。
+    // 放在 load 事件里，确保 flutterBootstrap 对象已就绪、setupHook 不被覆盖。
+    window.addEventListener('load', function () {
+      if (window.flutterBootstrap && typeof window.flutterBootstrap.setupHook === 'function') {
+        // 已设过则保留；否则设置
+      }
+      window.flutterBootstrap = window.flutterBootstrap || {};
+      window.flutterBootstrap.setupHook = function (engineInitializer) {
+        return engineInitializer.initializeEngine({ renderer: 'html' });
+      };
+    });
+  </script>
 </body>
 </html>

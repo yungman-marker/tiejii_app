@@ -1,21 +1,34 @@
 # Codemagic 构建配置 —— 铁骥大模型 APP（iOS，无 Mac 场景）
 #
-# 适用前提（用户已确认 2026-08-31）：
-#   - 本机无 Mac，仅有 iPhone 14 Pro 真机 + 免费 Apple ID（非 $99 付费）
-#   - 因此走「开发签名 (development)」+ Sideloadly 侧载，7 天过期需重签
-#   - 不可走 TestFlight / Ad-hoc（那需要付费 Apple Developer Program）
+# ⚠️ 2026-09-01 关键修正（之前方案有误，已纠正）：
+#   Codemagic 的「自动代码签名」走 App Store Connect API，而【免费 Apple ID】
+#   (personal team，非 $99 付费 Apple Developer Program) 没有该 API 权限，
+#   无法在云端直接对 IPA 签名。因此：
 #
-# 在 Codemagic 控制台需要做的：
-#   1. 连接 GitHub 仓库（代码已 push 到 github）
-#   2. Code signing → 选 "Apple Service Connect"，用你的免费 Apple ID 登录
-#      （Codemagic 会自动建开发证书 + 开发描述文件；首次需你在 Apple 账号里
-#       把 iPhone 14 Pro 的 UDID 登记为设备）
-#   3. 构建产物 .ipa 会在 Artifacts 里下载
-#   4. 本机用 Sideloadly（Windows 免费）把 .ipa 侧载到 iPhone 14 Pro
+#   ✅ 方案 A（免费 Apple ID，本机无 Mac 的唯一可行路径，默认启用）：
+#      云端【只构建「未签名」IPA】→ 本机 Windows 用 Sideloadly(免费) + 免费
+#      Apple ID 重签 → 侧载到 iPhone 14 Pro（7 天重签一次）。
+#      Sideloadly 会自动用你的 Apple ID 把 iPhone UDID 登记进 personal team，
+#      无需手动申请描述文件。官网 https://sideloadly.io
+#
+#   💡 方案 B（若已加入付费 Apple Developer Program $99/年）：
+#      在 Codemagic 「Environment variables」里配 App Store Connect API：
+#        APP_STORE_CONNECT_ISSUER_ID / APP_STORE_CONNECT_KEY_IDENTIFIER /
+#        APP_STORE_CONNECT_PRIVATE_KEY / CERTIFICATE_PRIVATE_KEY
+#      并把下方「构建未签名 IPA」脚本替换为：
+#        flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+#      （先去 ios/ExportOptions.plist 把 YOUR_TEAM_ID 改成你的 Team ID）
+#      这样云端直接产出可装 IPA，无需 Sideloadly。
+#
+# Codemagic 控制台步骤：
+#   1. 连接 GitHub 仓库（代码 push 到 github 后）
+#   2. 本 workflow 故意【不配置 iOS code signing】（产未签名包）
+#   3. 构建产物 *.ipa 在 Artifacts 下载
+#   4. 本机 Sideloadly 用免费 Apple ID 重签 → iPhone 14 Pro
 
 workflows:
-  ios-development:
-    name: iOS Development Build (free Apple ID)
+  ios-unsigned:
+    name: iOS Unsigned IPA (no Mac, free Apple ID path)
     max_build_duration: 60
     environment:
       flutter: stable
@@ -26,14 +39,17 @@ workflows:
         script: flutter pub get
       - name: 安装 iOS 原生依赖
         script: cd ios && pod install
-      - name: 构建 IPA（开发签名，自动签名）
+      - name: 构建未签名 IPA（--no-codesign，云端不签名）
         script: |
-          flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist
+          flutter build ios --release --no-codesign
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r "$CM_BUILD_DIR/build/ios/ipa/tiejii_unsigned.ipa" Payload
+          rm -rf Payload
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
-      # 不自动发 TestFlight（免费账号不支持）；仅邮件/Artifacts 下载
       email:
         recipients:
           - your@email.com   # 改成你的邮箱，构建完成会收到下载链接

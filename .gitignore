@@ -41,6 +41,10 @@ test_certificate.pfx
 *.pfx
 *.p12
 
+# resign.ps1 含明文 Apple ID 密码，严禁推到任何远程仓库（含 GitHub/Gitee）
+resign.ps1
+*.ps1
+
 
 # Obfuscation related
 app.*.map.json

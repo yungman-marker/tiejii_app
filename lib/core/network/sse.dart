@@ -181,7 +181,11 @@ class SseClient {
         ..headers.addAll({
           'Content-Type': 'application/json',
           'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
+          // 注意：不要加 `Cache-Control`。它是 CORS 非安全头，浏览器会因此
+          // 强制发 preflight，而后端 access-control-allow-headers 列表里没有
+          // `cache-control` → 预检被拒 → 整个 SSE 被 CORS 拦死（web 端聊天
+          // 直接失败，桌面端 native HTTP 不受影响）。实测后端对 GET/POST/OPTIONS
+          // 都正确返回 access-control-allow-origin:*，唯独不允许 cache-control。
           'X-Client-Type': AppConfig.clientType,
           'Authorization': 'Bearer $token',
         })

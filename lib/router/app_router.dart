@@ -147,44 +147,59 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 智能体详情
       GoRoute(
         path: '/agents/:id',
-        builder: (context, state) =>
-            AgentDetailScreen(agentId: state.pathParameters['id']!),
+        pageBuilder: (context, state) {
+          final child = AgentDetailScreen(agentId: state.pathParameters['id']!);
+          return isDesktop(context)
+              ? MaterialPage<dynamic>(child: child)
+              : CupertinoPage<dynamic>(child: child);
+        },
       ),
       // 知识库搜索
       GoRoute(
         path: '/knowledge/search',
-        builder: (context, state) => const KbSearchScreen(),
+        pageBuilder: (context, state) => isDesktop(context)
+            ? const MaterialPage<dynamic>(child: KbSearchScreen())
+            : const CupertinoPage<dynamic>(child: KbSearchScreen()),
       ),
       // 搜索结果 · AI 总结
       GoRoute(
         path: '/knowledge/results',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final q = state.uri.queryParameters['q'] ?? '';
-          return KbResultsScreen(query: q);
+          final child = KbResultsScreen(query: q);
+          return isDesktop(context)
+              ? MaterialPage<dynamic>(child: child)
+              : CupertinoPage<dynamic>(child: child);
         },
       ),
       // 目录文件列表（点进某个目录后查看其下文件）
       GoRoute(
         path: '/knowledge/dir',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final q = state.uri.queryParameters;
-          return KnowledgeDirScreen(
+          final child = KnowledgeDirScreen(
             dirId: q['dirId'] ?? '',
             dirName: q['name'] ?? '目录',
             type: q['type'] ?? '1',
           );
+          return isDesktop(context)
+              ? MaterialPage<dynamic>(child: child)
+              : CupertinoPage<dynamic>(child: child);
         },
       ),
       // 文件预览（在 APP 内打开，不跳外部浏览器）
       GoRoute(
         path: '/file/preview',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final q = state.uri.queryParameters;
-          return FilePreviewScreen(
+          final child = FilePreviewScreen(
             url: q['url'] ?? '',
             name: q['name'] ?? '',
             ext: q['ext'] ?? '',
           );
+          return isDesktop(context)
+              ? MaterialPage<dynamic>(child: child)
+              : CupertinoPage<dynamic>(child: child);
         },
       ),
     ],
@@ -192,15 +207,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 });
 
 /// 统一「从右往左滑入」转场（千问风），用于个人中心及其子菜单全屏页。
-CustomTransitionPage<dynamic> _slidePage(Widget child) => CustomTransitionPage<dynamic>(
-      child: child,
-      transitionDuration: const Duration(milliseconds: 320),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(1.0, 0.0);
-        const end = Offset.zero;
-        const curve = Curves.easeInOutCubic;
-        final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-        return SlideTransition(position: animation.drive(tween), child: child);
-      },
-    );
+///
+/// 使用 [CupertinoPage]：原生 iOS「从右滑入」动画 + 自带**左边缘滑动返回手势**
+/// （CustomTransitionPage 不带手势，所以之前手机端无法左滑回退）。
+/// 仅移动端调用（桌面端 /me/* 走 NoTransitionPage，不进此函数）。
+Page<dynamic> _slidePage(Widget child) => CupertinoPage<dynamic>(child: child);

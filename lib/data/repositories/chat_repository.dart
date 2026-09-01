@@ -253,6 +253,11 @@ class ChatRepository {
     /// 单条最新用户消息文本（turns:stream 只发最后一条，上下文由服务端按
     /// sessionId 续接，不传历史 messages 数组）。
     required String text,
+    /// 附件资源（图片/文件）。每项形如 `{'fileId': '...', 'fileName': '...'}`，
+    /// 由 `/file/upload` 返回的 id 构造。后端 turns:stream 从这里读真实图片给
+    /// AI 看图；text 里只承担「历史显示」职责（如 `[附件] xxx.png`），AI 不再
+    /// 仅凭文件名瞎猜。仅在该轮有附件时携带，无附件传空数组。
+    List<Map<String, dynamic>> resources = const [],
     bool thinkEnable = false,
     /// 智能体（Skill）id：从智能体详情 → 「开始对话」进入时绑定；
     /// null 表示普通对话。会话生命周期内保持绑定，新建对话时清理。
@@ -270,7 +275,7 @@ class ChatRepository {
       'projectId': null,
       'message': {
         'text': text,
-        'resources': <dynamic>[],
+        'resources': resources,
       },
       'execution': {
         'modelId': modelId,

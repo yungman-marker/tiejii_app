@@ -138,14 +138,14 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// 发送消息并开启流式生成。
   /// [thinkEnable] 透传「深度思考」开关（对应 experience:stream 的 thinkEnable 参数）。
-  void send(String text, {bool thinkEnable = false}) {
+  void send(String text, {bool thinkEnable = false, List<Map<String, dynamic>> resources = const []}) {
     final content = text.trim();
     if (content.isEmpty || state.streaming) return;
 
     final userMessage =
         ChatMessage(id: _newId(), role: ChatRole.user, content: content);
     state = state.copyWith(messages: [...state.messages, userMessage]);
-    _startStream(thinkEnable: thinkEnable);
+    _startStream(thinkEnable: thinkEnable, resources: resources);
   }
 
   /// 重新生成：丢弃上一条助手回复后重发最后一轮。
@@ -168,7 +168,7 @@ class ChatController extends StateNotifier<ChatState> {
     _finish();
   }
 
-  Future<void> _startStream({bool thinkEnable = false}) async {
+  Future<void> _startStream({bool thinkEnable = false, List<Map<String, dynamic>> resources = const []}) async {
     final repository = _repository;
     final modelId = state.modelId;
 
@@ -215,7 +215,7 @@ class ChatController extends StateNotifier<ChatState> {
     // 主通道：/ai/chat/conversations/turns:stream（与 Web 同源、契约逐字对齐，
     // 首帧 TURN_STARTED 回填 chatSessionId，消息归档后 web 端可见）。若其契约
     // 不匹配、首帧前就报错，_beginStream 会自动回退到 experience:stream，保证「能聊天」。
-    _beginStream(modelId, history, userText, thinkEnable, useTurn: true);
+    _beginStream(modelId, history, userText, thinkEnable, useTurn: true, resources: resources);
   }
 
   /// 真正发起流式请求；[useTurn]=true 走归档主通道，false 走兜底 experience:stream。
@@ -228,6 +228,7 @@ class ChatController extends StateNotifier<ChatState> {
     String text,
     bool thinkEnable, {
     required bool useTurn,
+    List<Map<String, dynamic>> resources = const [],
   }) {
     final repository = _repository;
     if (repository == null) return;
@@ -235,7 +236,7 @@ class ChatController extends StateNotifier<ChatState> {
     void onError(Object error) {
       if (useTurn && !_contentReceived) {
         // 主通道契约不匹配（多半是 body 字段名差异），回退经验通道
-        _beginStream(modelId, history, text, thinkEnable, useTurn: false);
+        _beginStream(modelId, history, text, thinkEnable, useTurn: false, resources: resources);
         return;
       }
       _onError(error);
@@ -245,6 +246,7 @@ class ChatController extends StateNotifier<ChatState> {
         ? repository.streamTurn(
             modelId: modelId,
             text: text,
+            resources: resources,
             thinkEnable: thinkEnable,
             agentId: state.agentId,
             sessionId: state.sessionId ?? '',

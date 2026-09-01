@@ -570,7 +570,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       );
   }
 
-  /// 发送：把附件名拼到正文前，随消息一起提交（后端 chat 接口以文本承载附件引用）。
+  /// 发送：把附件名拼到正文前随消息一起提交（用于历史显示），
+  /// 同时把上传成功拿到的 fileId 放进 resources（后端 turns:stream
+  /// 协议的 message.resources 字段），让 AI 真正能"看图"。
+  /// 没拿到 id 的附件（说明上传失败/未上传）只走 text 拼文件名，仅作
+  /// 历史展示，AI 无法读其内容。
   void _send(String text) {
     final content = text.trim();
     if (content.isEmpty && _attachments.isEmpty) return;
@@ -579,8 +583,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       buffer.writeln('[附件] ${_attachments.map((a) => a.name).join('、')}');
     }
     if (content.isNotEmpty) buffer.writeln(content);
-    ref.read(chatControllerProvider.notifier).send(buffer.toString().trim(),
-        thinkEnable: _deepThinking);
+    // 上传成功才有 id；过滤掉没 id 的附件，避免把 null/空串塞给后端
+    final resources = <Map<String, dynamic>>[];
+    for (final a in _attachments) {
+      if (a.id != null && a.id!.isNotEmpty) {
+        resources.add({'fileId': a.id, 'fileName': a.name});
+      }
+    }
+    ref.read(chatControllerProvider.notifier).send(
+      buffer.toString().trim(),
+      resources: resources,
+      thinkEnable: _deepThinking,
+    );
     setState(() => _attachments.clear());
   }
 

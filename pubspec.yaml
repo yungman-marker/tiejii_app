@@ -33,6 +33,12 @@ dependencies:
   flutter_svg: ^2.0.10+1
   # 桌面端窗口管理：限制窗口最小尺寸，避免被拖到过小导致内容展示不全
   window_manager: ^0.5.1
+  # 移动端原生能力：语音播报（TTS，iOS/Android 离线中文朗读）
+  flutter_tts: ^4.0.2
+  # 移动端原生能力：拍照 / 相册选择（image_picker）
+  image_picker: ^1.1.2
+  # 移动端原生能力：任意文件选择（附件上传）
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

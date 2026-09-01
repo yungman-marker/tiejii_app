@@ -555,7 +555,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }) async {
     if (!mounted) return;
     try {
-      final picked = await pickFile(extensions: extensions);
+      final picked = await pickFile(
+        extensions: extensions,
+        mode: PickMode.values[mode.index],
+      );
       if (picked == null) return;
       if (!mounted) return;
       final result = await ref.read(fileRepositoryProvider).upload(

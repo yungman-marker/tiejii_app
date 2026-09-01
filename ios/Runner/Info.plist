@@ -80,5 +80,10 @@
 			</dict>
 		</dict>
 	</dict>
+	<!-- 移动端原生能力权限声明（拍照 / 相册）。缺任一会调起即崩。 -->
+	<key>NSCameraUsageDescription</key>
+	<string>铁骥大模型需要使用相机拍摄图片，用于拍图答疑</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>铁骥大模型需要访问相册以选择图片，用于拍图答疑</string>
 </dict>
 </plist>

@@ -28,7 +28,26 @@ Future<bool> readAloud(String text, {void Function()? onEnd}) async {
     // 先停掉上一段，避免连点叠加
     await _tts.stop();
     await _tts.setLanguage('zh-CN');
-    await _tts.setSpeechRate(1.0);
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      // iOS 的 speechRate 范围 0(最慢)~1(最快)，正常语速约 0.5；
+      // 之前用 1.0 正是“最快”档，所以耳机里听到的语速过快。
+      await _tts.setSpeechRate(0.5);
+      // iOS 音频路由默认走听筒(receiver)，无耳机时外放无声。
+      // 用共享 session + playback + defaultToSpeaker：无耳机时走主扬声器，
+      // 插耳机/蓝牙时自动切换（defaultToSpeaker 只覆盖“无外接设备”的情况）。
+      // 另外语音输入(speech_to_text)会把 AVAudioSession 设为 playAndRecord 占用
+      // 路由，这里每次朗读前重设一遍可强制修正回扬声器。
+      await _tts.setSharedInstance(true);
+      await _tts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playback,
+        const [IosTextToSpeechAudioCategoryOptions.defaultToSpeaker],
+      );
+    } else {
+      // Android 的 speechRate 范围 0~2，1.0 为正常语速
+      await _tts.setSpeechRate(1.0);
+    }
+
     await _tts.setVolume(1.0);
     await _tts.setPitch(1.0);
     if (onEnd != null) {

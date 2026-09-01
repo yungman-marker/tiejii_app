@@ -198,7 +198,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 child: Column(children: bodyChildren),
               ),
             )
-          : Column(children: bodyChildren),
+          // 移动端：点空白处收起键盘（iOS 软键盘不会随点击外部自动隐藏）
+          : GestureDetector(
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Column(children: bodyChildren),
+            ),
     );
   }
 
@@ -341,6 +345,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget _buildMessageList(ChatState chat) {
     return ListView.builder(
       controller: _scrollController,
+      reverse: true,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       itemCount: chat.messages.length,
       itemBuilder: (context, index) {
@@ -516,11 +521,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
+      // reverse:true：列表天然锚定在底部（offset=0 即最新消息）。
+      // 仅当用户已在底部附近时才跟随，避免把正向上翻看历史的人强行拉回；
+      // 用 jumpTo(0) 而非 animateTo，消除键盘升降时 maxScrollExtent 瞬时错位导致的"先上滑再下滑"。
+      final pos = _scrollController.position;
+      if (pos.pixels > 120) return;
+      _scrollController.jumpTo(0);
     });
   }
 

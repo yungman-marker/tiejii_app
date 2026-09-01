@@ -137,7 +137,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (mounted) setState(() => _listening = true);
     try {
       await _speech!.listen(
-        onResult: (stt.SpeechRecognitionResult result) {
+        onResult: (result) {
           if (!mounted) return;
           final text = result.recognizedWords;
           _controller.text = text;

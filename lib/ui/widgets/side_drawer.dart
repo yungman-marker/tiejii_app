@@ -289,6 +289,12 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
           child: SafeArea(
             child: Column(
               children: [
+                // 头部固定（不随历史列表滚动）：搜索模式 = iOS 风圆角胶囊+取消；
+                // 普通模式 = logo+搜索 icon。移出 ListView 后，滑历史时顶部不再被带走。
+                if (_searching)
+                  _buildSearchHeader()
+                else
+                  _buildDrawerHeader(),
                 Expanded(
                   child: NotificationListener<ScrollNotification>(
                     onNotification: _handleScroll,
@@ -299,11 +305,6 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: EdgeInsets.zero,
                       children: [
-                        // 头部：搜索模式 = iOS 风圆角胶囊+取消；普通模式 = logo+搜索 icon
-                        if (_searching)
-                          _buildSearchHeader()
-                        else
-                          _buildDrawerHeader(),
                         // body：搜索模式 = 匹配结果；普通模式 = 新建对话 + 功能项 + 历史列表
                         if (!_searching) ...[
                           _buildNewChat(),

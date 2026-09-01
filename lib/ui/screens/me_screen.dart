@@ -220,27 +220,45 @@ String _themeModeLabel(ThemeMode mode) => switch (mode) {
       ThemeMode.system => '系统',
     };
 
+/// 触发退出登录的二次确认框（AlertDialog）。
+///
+/// ## 三个关键修复
+///
+/// 1. **`builder` 用 dialogBuilder 的 [dialogCtx] 而非闭包外的 `ctx`**：
+///    之前 `Navigator.pop(ctx)` 中 `ctx` 是 me_screen 的 BuildContext——
+///    close 链路正确但**容易误关掉 me 路由本身**（特别是登出后 ctx 仍可能引用
+///    已经 replaced 的元素链）。换成 dialogBuilder 的 ctx 之后，pop 永远只关闭
+///    当前对话框，不再涉及外层路由。
+///
+/// 2. **「取消」按钮只为 pop dialog，不做其它动作**。之前如果 onPressed
+///    错误地闭上了 me 路由，整个 me_screen 会被销毁；下一次按就找不到 onPressed
+///    绑定的元素了，于是出现「点击取消、退出都没有任何反应」的卡死感。
+///
+/// 3. **「退出」按确认顺序**：先 pop dialog → 再 logout() → 最后 `await` 让
+///    router redirect 走完。三步**串行**，避免在 dialog 还没关闭时竞争路由。
 void _confirmLogout(BuildContext ctx, WidgetRef ref) {
-  showDialog(
+  showDialog<void>(
     context: ctx,
-    builder: (_) => AlertDialog(
+    barrierDismissible: false,
+    builder: (dialogCtx) => AlertDialog(
       title: const Text('退出登录'),
       content: const Text('确定退出当前账号？'),
       actions: [
         TextButton(
-            onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
+          // 「取消」：只关闭 dialog 即可，不做任何额外动作。
+          onPressed: () => Navigator.of(dialogCtx).pop(),
+          child: const Text('取消'),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          onPressed: () {
-            Navigator.pop(ctx); // 关闭确认弹窗
-            ref.read(authControllerProvider.notifier).logout();
-            // 关闭全屏个人中心页，回到主页
-            final navigator = Navigator.of(ctx, rootNavigator: true);
-            if (navigator.canPop()) {
-              navigator.pop();
-            } else {
-              GoRouter.of(ctx).go('/chat');
-            }
+          onPressed: () async {
+            // ① 先关 dialog；保证下一帧 dialog 就消失，避免与 router 重定向抢焦点。
+            Navigator.of(dialogCtx).pop();
+            // ② 触发 auth 状态变更（清 token / 清本地身份），isLoggedIn 变 false。
+            await ref.read(authControllerProvider.notifier).logout();
+            // ③ GoRouter redirect 会自动把用户送到 /login，这里不主动 pop()/go()，
+            //    避免与 redirect 重叠导致 me 路由被多 pop 一次。
+            //    （redirect 规则见 app_router.dart：!isLoggedIn && !atLogin → /login）
           },
           child: const Text('退出'),
         ),

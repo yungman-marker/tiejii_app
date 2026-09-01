@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -67,8 +68,17 @@ class _ChatInputBarState extends State<ChatInputBar>
       vsync: this,
       duration: const Duration(milliseconds: 280),
     );
-    // 仅在移动端初始化语音识别（Windows 桌面不触碰，避免原生能力缺失导致问题）
-    if (!isDesktop(context)) _initSpeech();
+    // 仅在真移动端（Android / iOS）初始化语音识别。
+    // initState 阶段 element 树尚未就绪，禁止读 InheritedWidget——
+    // 之前用 `if (!isDesktop(context)) _initSpeech();` 会触发 MediaQuery.of，
+    // 报 "dependOnInheritedWidgetOfExactType<MediaQuery>() ... was called
+    // before _ChatInputBarState.initState() completed"，整页红屏。
+    // 改用平台常量判断，绕开对 context 的依赖；桌面端同样跳过。
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS)) {
+      _initSpeech();
+    }
   }
 
   /// 初始化语音识别能力并优选中文 locale。失败（设备不支持）则保持不可用。

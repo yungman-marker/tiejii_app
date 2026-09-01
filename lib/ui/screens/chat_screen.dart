@@ -35,7 +35,8 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with WidgetsBindingObserver {
   final _scrollController = ScrollController();
 
   /// 待发送的附件（已上传 /file/upload）。
@@ -48,6 +49,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    // 监听尺寸/viewInsets 变化（键盘弹起/收起、系统 UI 变化），
+    // 在跳转到底部跟随最新消息，避免键盘展开瞬间列表看起来"先上滑再下滑"。
+    WidgetsBinding.instance.addObserver(this);
     // 进入即加载模型列表，并把移动端默认模型同步给对话控制器
     Future.microtask(() async {
       await ref.read(modelControllerProvider.notifier).load();
@@ -64,8 +68,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 键盘弹起/收起、系统 UI 变化 → 重新贴底，让最新消息始终可见。
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    _scrollToBottom();
   }
 
   @override
@@ -348,9 +360,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildMessageList(ChatState chat) {
+    // 正常时间顺序渲染：数据本身就是 [最早, ..., 最新]，
+    // 所以不需要 reverse——以前 reverse:true 把最新消息抛到屏幕顶部，
+    // 看起来就像「AI 回复跑到用户消息前面」。
     return ListView.builder(
       controller: _scrollController,
-      reverse: true,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
       itemCount: chat.messages.length,
       itemBuilder: (context, index) {
@@ -526,12 +540,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      // reverse:true：列表天然锚定在底部（offset=0 即最新消息）。
-      // 仅当用户已在底部附近时才跟随，避免把正向上翻看历史的人强行拉回；
-      // 用 jumpTo(0) 而非 animateTo，消除键盘升降时 maxScrollExtent 瞬时错位导致的"先上滑再下滑"。
+      // 正常顺序渲染：最新消息在 ListView 末尾，最底部 = maxScrollExtent。
+      // 用 jumpTo(maxScrollExtent) 而非 animateTo，避免键盘升降时
+      // maxScrollExtent 瞬时错位导致的"先上滑再下滑"动画。
+      // 仅当用户已在底部附近时跟随，避免把正向上翻看历史的人强行拉回。
       final pos = _scrollController.position;
-      if (pos.pixels > 120) return;
-      _scrollController.jumpTo(0);
+      final distanceFromBottom = pos.maxScrollExtent - pos.pixels;
+      if (distanceFromBottom > 200) return;
+      _scrollController.jumpTo(pos.maxScrollExtent);
     });
   }
 

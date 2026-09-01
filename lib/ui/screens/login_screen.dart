@@ -97,33 +97,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // 用与图片最底行边缘一致的色 #EDF1FC（采自 login_mobile_top.png 底部两侧 1/3 区域），
     // 把整个 body 容器填成这个色，让图片下沿与下方背景完全无缝衔接，
     // 视觉上看起来「一整张图片作为页面背景」。桌面端 _buildDesktop 不动。
+    // 关键：整页（顶部图 + 表单卡）包在同一个 SingleChildScrollView 里，
+    // 键盘弹起时二者作为一个整体一起上滑，表单不会被键盘遮挡、顶部图也不会固定不动。
+    // （Scaffold 默认 resizeToAvoidBottomInset=true，会自动把 body 高度减去键盘高度，
+    // 再由这个滚动容器接管剩余内容的滚动。）
     return Container(
       color: const Color(0xFFEDF1FC),
-      child: Column(
-        children: [
-          // 移动端顶部图：与桌面端 _LoginBackground 完全解耦。
-          // 新素材 assets/login_mobile_top.png 原比例 602×396 ≈ 1.52:1，
-          // 用 AspectRatio 自适应屏宽、保持比例渲染；
-          // 桌面端代码（_LoginBackground / login_bg.png）完全不变。
-          AspectRatio(
-            aspectRatio: 602 / 396,
-            child: Image.asset(
-              'assets/login_mobile_top.png',
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 移动端顶部图：与桌面端 _LoginBackground 完全解耦。
+            // 新素材 assets/login_mobile_top.png 原比例 602×396 ≈ 1.52:1，
+            // 用 AspectRatio 自适应屏宽、保持比例渲染；
+            // 桌面端代码（_LoginBackground / login_bg.png）完全不变。
+            AspectRatio(
+              aspectRatio: 602 / 396,
+              child: Image.asset(
+                'assets/login_mobile_top.png',
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                errorBuilder: (ctx, err, st) => const SizedBox.shrink(),
+              ),
             ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
               child: _FormCard(
                 isWide: false,
                 child: _buildFormColumn(auth),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -134,11 +140,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 顶部品牌 logo（铁骥品牌：蓝马+红"铁骥"中文，用安装包logo.png）
+        // 顶部品牌 logo（铁骥大模型横长标）
         Center(
           child: Image.asset(
-            'assets/安装包logo.png',
-            width: 120,
+            'assets/title.png',
+            width: 280,
             fit: BoxFit.contain,
           ),
         ),

@@ -52,7 +52,8 @@ workflows:
           ls -la "$CM_BUILD_DIR/build/ios/ipa/"
     artifacts:
       - build/ios/ipa/*.ipa
-    publishing:
-      email:
-        recipients:
-          - your@email.com   # 改成你的邮箱，构建完成会收到下载链接
+    # 如需构建完成邮件通知，取消注释并填你的邮箱：
+    # publishing:
+    #   email:
+    #     recipients:
+    #       - you@example.com

@@ -52,18 +52,30 @@ class ChatBubble extends StatelessWidget {
     );
   }
 
+  /// 用户气泡：千问 / DeepSeek 风格——极浅蓝底 + 品牌深字 + 紧凑
+  /// padding (12/8) + 圆角 12。
+  ///
+  /// 色板：
+  /// - 底色复用 AppColors.primarySoft（rgba(77,124,255,.14)），和
+  ///   抽屉/Agent/数据管理里的"选中态高亮"语义一致；
+  /// - 字色用 AppColors.textPrimary（接近黑的沉稳灰黑 0xFF1F2937），
+  ///   用户要求气泡文字为黑色，而非品牌蓝。
+  /// - 不用 scheme.primary 实底+白字——那种是"通知红点/重要徽标"
+  ///   视觉重量，对话里太抢戏。
+  ///
+  /// 助手气泡仍走白卡 + 16 圆角（更像文档卡片），两者视觉重量
+  /// 不一致但符合主流 AI 客户端惯例（千问/DeepSeek/豆包均如此）。
   Widget _buildUserBubble(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: scheme.primary,
-        borderRadius: BorderRadius.circular(AppRadius.bubble),
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         message.content,
-        style: TextStyle(
-          color: scheme.onPrimary,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
           fontSize: 15,
           height: 1.55,
         ),

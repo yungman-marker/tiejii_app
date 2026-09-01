@@ -258,12 +258,47 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
     });
   }
 
-  void _nav(String path, {bool push = false}) {
+  /// 抽屉内的导航跳转：从抽屉底部入口跳到 /me 等全屏页面时，**不要**主动 pop。
+  ///
+  /// ## 旧实现的坑（已修）
+  ///
+  /// 旧代码：
+  /// ```dart
+  /// if (!widget.embedded) Navigator.pop(context);  // ← 这行
+  /// ```
+  ///
+  /// 看起来像是"关闭 drawer"，但实际上 `Navigator.pop(context)` 找的是 **最近的
+  /// NavigatorScope 祖先**——也就是 rootNavigator（Material 自带的）。
+  /// 直接从 rootNavigator 的栈顶弹走，**会顺手把当前页面（比如正在呈现的 MeScreen
+  /// 或 ChatScreen）误关掉**——这就是用户反馈的"从抽屉底部进入个人中心、退出登录时
+  /// 点击取消没反应"的根因之一。
+  ///
+  /// 抽屉本身就是 Flutter `Drawer` widget，由 Scaffold 内部控制动画；
+  /// 想关抽屉应该找该 Scaffold（不是 rootNavigator）。**这里只负责路由器跳转，**
+  /// 抽屉的开关交由用户下次手动操作：
+  ///
+  /// - 进入 /me 等全屏覆盖页 → me_screen 视觉上覆盖整个屏幕（包括抽屉区域）；
+  /// - 用户点 ← 返回 /chat 时 → drawer 仍然保留在原来的 state（包括打开状态），
+  ///   而不是被无声销毁后再开。
+  ///
+  /// 注意：drawer 自身的状态切换（打开 / 关闭）由 Scaffold 在用户滑动手势 /
+  /// 点击顶栏 drawer 按钮时驱动，与此函数无关。
+  /// 抽屉内的跳转统一入口。
+  ///
+  /// - [closeDrawer]：true 时在跳转前收起左侧抽屉（替代之前误用的
+  ///   `Navigator.pop`，pop 会弹掉 rootNavigator 栈顶的 ChatScreen 而非关抽屉）。
+  ///   仅"历史对话 / 开启新对话 / 智能问答"需要关抽屉；"个人中心"保持不关
+  ///   （之前的修复：进入 /me 返回时抽屉应保留）。
+  void _nav(String path, {bool push = false, bool closeDrawer = false}) {
+    // embedded（桌面端常驻侧栏）模式下 SideDrawer 直接挂在 MainShell 的
+    // Row 下，外层没有 Scaffold.drawer——`Scaffold.of(context)` 会抛
+    // "no Scaffold" 异常并中断后续路由跳转（桌面端点击无反应的根因）。
+    // 因此只有非 embedded（移动端 overlay 抽屉）才关抽屉。
+    if (closeDrawer && !widget.embedded) Scaffold.of(context).closeDrawer();
     // 跳转前先释放抽屉内搜索框焦点，避免焦点被新页面（聊天输入框）继承、键盘自动弹出
     _searchFocusNode.unfocus();
     FocusScope.of(context).unfocus();
     final router = GoRouter.of(context);
-    if (!widget.embedded) Navigator.pop(context);
     if (push) {
       router.push(path);
     } else {
@@ -365,8 +400,6 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
 
   /// 抽屉头部：左侧品牌 logo + 右侧搜索图标按钮（DeepSeek 风格）。
   ///
-  /// 品牌 logo 用 `assets/安装包logo.png`（铁骥品牌：方形蓝马+红"铁骥"中文），
-  /// 32×32 显示在 header 26px 行高里，BoxFit.contain 自适应不裁切。
   /// 不是胶囊搜索框而是 36×36 圆形浅灰底图标按钮：点击后关抽屉并
   /// `push SessionSearchScreen`（全屏搜索页）。
   /// 整 header 行高 44，便于与下面的"新建对话"主按钮视觉上拉开。
@@ -377,10 +410,9 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            height: 32,
-            width: 32,
+            height: 26,
             child: Image.asset(
-              'assets/安装包logo.png',
+              'assets/title.png',
               fit: BoxFit.contain,
               alignment: Alignment.centerLeft,
             ),
@@ -588,8 +620,11 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
             // 关抽屉前先释放搜索框焦点，避免键盘被聊天输入框继承
             _searchFocusNode.unfocus();
             FocusScope.of(context).unfocus();
+            // 收起左侧抽屉（用 Scaffold.closeDrawer，而非 Navigator.pop——
+            // pop 会误弹 rootNavigator 栈顶的 ChatScreen）。
+            // embedded（桌面常驻侧栏）无 Scaffold.drawer，跳过避免抛异常。
+            if (!widget.embedded) Scaffold.of(context).closeDrawer();
             final router = GoRouter.of(context);
-            if (!widget.embedded) Navigator.pop(context);
             router.go('/chat');
             ref.read(chatControllerProvider.notifier).newChat();
           },
@@ -621,7 +656,7 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         _featureTile(
           icon: Icons.chat_bubble_outline,
           label: '智能问答',
-          onTap: () => _nav('/chat'),
+          onTap: () => _nav('/chat', closeDrawer: true),
         ),
         _featureTile(
           icon: Icons.smart_toy_outlined,
@@ -850,12 +885,14 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         ),
       ),
       onTap: () {
-        // 1) 切换到该历史会话；2) 关抽屉；3) 路由回 /chat 让对话屏展示历史占位。
-        // 关抽屉前先释放搜索框焦点，避免键盘被聊天输入框继承自动弹出
+        // 切换到该历史会话并路由回 /chat。
+        // 点击历史对话要收起抽屉：用 Scaffold.closeDrawer（不是 Navigator.pop——
+        // pop 会误弹 rootNavigator 栈顶的 ChatScreen，导致返回后栈不一致）。
+        // embedded（桌面常驻侧栏）无 Scaffold.drawer，跳过避免抛异常。
         _searchFocusNode.unfocus();
         FocusScope.of(context).unfocus();
+        if (!widget.embedded) Scaffold.of(context).closeDrawer();
         ref.read(chatControllerProvider.notifier).openSession(session.sessionId);
-        if (!widget.embedded) Navigator.pop(context);
         GoRouter.of(context).go('/chat');
       },
     );

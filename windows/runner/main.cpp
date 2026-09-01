@@ -27,7 +27,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
-  if (!window.Create(L"tiejii_app", origin, size)) {
+  // 桌面端窗口标题（任务栏、Alt+Tab 切换、窗口标题栏显示用），改成中文品牌名"铁骥大模型"。
+  // 技术标识符（pubspec name / bundle id / exe OriginalFilename）保持 tiejii_app 不动。
+  if (!window.Create(L"铁骥大模型", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

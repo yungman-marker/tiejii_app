@@ -1,5 +1,6 @@
 import 'dart:html' as html;
-import 'dart:js_util' as js_util;
+import 'dart:js_interop' as js;
+import 'dart:js_interop_unsafe';
 
 /// 朗读指定文本（浏览器 SpeechSynthesis API）。
 ///
@@ -12,6 +13,9 @@ import 'dart:js_util' as js_util;
 /// [onEnd] 在朗读自然结束、被 `stopReading()` 取消或被下一次 `readAloud`
 /// 顶掉时都会触发（Web 的 `onend` 事件，cancel 也会派发）。业务侧用它来
 /// 把「正在播放」状态还原回气泡上的图标。
+///
+/// 注：Flutter 3.47 起 `dart:js_util` 已从 SDK 移除，这里改用 `dart:js_interop`
+/// + `dart:js_interop_unsafe` 完成 onend 回调与 navigator.share 的调用。
 Future<bool> readAloud(String text, {void Function()? onEnd}) async {
   if (text.trim().isEmpty) return false;
 
@@ -31,10 +35,9 @@ Future<bool> readAloud(String text, {void Function()? onEnd}) async {
   utter.volume = 1.0;
 
   if (onEnd != null) {
-    // 用 js_util 设置 onend（Dart 闭包需 allowInterop 才能被 JS 回调）
-    js_util.setProperty(utter, 'onend', js_util.allowInterop((_) {
-      onEnd();
-    }));
+    // 用 js_interop 设置 onend（Dart 闭包需转成 JS 函数才能被 JS 回调）
+    final utterJs = utter as js.JSObject;
+    utterJs.setProperty('onend'.toJS, onEnd.toJS);
   }
 
   try {
@@ -65,21 +68,19 @@ Future<void> stopReading() async {
 Future<bool> shareText(String text) async {
   if (text.trim().isEmpty) return false;
   final nav = html.window.navigator;
-  if (nav == null) return false;
 
-  // 用 js_util 调用以避免 dart:html 类型层面不存在的兼容问题
-  // （部分 Flutter 内置的 dart:html Navigator 类型不一定带 share 字段）
-  final hasShare = js_util.hasProperty(nav, 'share');
-  if (hasShare == true) {
+  final navJs = nav as js.JSObject;
+  // navigator.share 在 dart:html 类型层未声明，用 js_interop 探测并调用
+  final shareFn = navJs['share'];
+  if (shareFn != null) {
     try {
-      await js_util.promiseToFuture<void>(
-        js_util.callMethod(nav, 'share', [
-          js_util.jsify(<String, String>{
-            'title': '铁骥大模型',
-            'text': text,
-          }),
-        ]),
-      );
+      // 手动构造 share 入参对象，避免依赖 jsify 的扩展签名差异
+      final shareObj = js.JSObject();
+      shareObj.setProperty('title'.toJS, '铁骥大模型'.toJS);
+      shareObj.setProperty('text'.toJS, text.toJS);
+
+      final promise = navJs.callMethod('share'.toJS, shareObj);
+      await (promise as js.JSPromise).toDart;
       return true;
     } catch (_) {
       // 用户取消分享面板 / 权限拒绝 → 继续走剪贴板兜底
@@ -90,9 +91,7 @@ Future<bool> shareText(String text) async {
   try {
     final cb = nav.clipboard;
     if (cb == null) return false;
-    await js_util.promiseToFuture<void>(
-      js_util.callMethod(cb, 'writeText', [text]),
-    );
+    await cb.writeText(text);
     return true;
   } catch (_) {
     return false;

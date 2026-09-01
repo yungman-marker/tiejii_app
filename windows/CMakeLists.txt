@@ -32,6 +32,15 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# MSVC 2026 (14.51) upgraded the deprecation of <experimental/coroutine> from a
+# warning to a hard error (STL1011). Several Windows plugins (e.g.
+# permission_handler_windows) still rely on <experimental/coroutine> via the
+# /await switch, and the project opts into /WX (warnings-as-errors), so the
+# build fails. This macro ONLY silences that STL deprecation diagnostic — it
+# changes no runtime behavior — letting the Windows build pass. Scope is the
+# whole directory, so it covers runner + every plugin target.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

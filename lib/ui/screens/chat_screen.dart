@@ -115,9 +115,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     // 桌面宽屏才需要"内容居中 + 限制最大宽度"的阅读体验（见下方 body 的 isWide 分支）。
     final bodyChildren = <Widget>[
       Expanded(
-        child: chat.historyLoading
-            ? _buildHistoryLoading()
-            : (chat.isEmpty ? _buildEmptyState() : _buildMessageList(chat)),
+        // 移动端：点消息列表/空白区域收回软键盘（iOS 标准 UX）。
+        // 桌面端 `onTap: null` → 不抢输入框焦点，桌面行为零变化。
+        // `HitTestBehavior.opaque` 让 ListView 之间的空白也命中，
+        // 但消息气泡的操作按钮（复制/TTS）通过 gesture arena 仍优先触发。
+        child: GestureDetector(
+          onTap: isWide ? null : () => FocusScope.of(context).unfocus(),
+          behavior: HitTestBehavior.opaque,
+          child: chat.historyLoading
+              ? _buildHistoryLoading()
+              : (chat.isEmpty ? _buildEmptyState() : _buildMessageList(chat)),
+        ),
       ),
       if (chat.error != null) _buildErrorBar(chat.error!),
       if (availabilityNotice != null)

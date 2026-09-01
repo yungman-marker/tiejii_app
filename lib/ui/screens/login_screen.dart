@@ -50,9 +50,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isWide = isDesktop(context);
 
     return Scaffold(
-      // 桌面端保留原浅灰底（_Light.bgPage），移动端按用户要求改为透明 #00000000，
-      // 二者彻底解耦，改动不影响桌面端。
-      backgroundColor: isWide ? _Light.bgPage : Colors.transparent,
+      // 桌面端保留原浅灰底（_Light.bgPage），移动端用 body 同色 #EDF1FC
+      // 把整屏（含底部 home indicator 安全区）一起填上，避免安全区
+      // 透出黑色窗口背景。桌面端分支完全不动。
+      backgroundColor: isWide ? _Light.bgPage : const Color(0xFFEDF1FC),
       body: isWide ? _buildDesktop(auth) : _buildMobile(auth),
     );
   }

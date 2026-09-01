@@ -259,6 +259,9 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
   }
 
   void _nav(String path, {bool push = false}) {
+    // 跳转前先释放抽屉内搜索框焦点，避免焦点被新页面（聊天输入框）继承、键盘自动弹出
+    _searchFocusNode.unfocus();
+    FocusScope.of(context).unfocus();
     final router = GoRouter.of(context);
     if (!widget.embedded) Navigator.pop(context);
     if (push) {
@@ -578,6 +581,9 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         // 不用蓝色描边（旧版千问风），改用中性浅灰底，hover/press 由 OutlinedButton 自动加深。
         child: OutlinedButton.icon(
           onPressed: () {
+            // 关抽屉前先释放搜索框焦点，避免键盘被聊天输入框继承
+            _searchFocusNode.unfocus();
+            FocusScope.of(context).unfocus();
             final router = GoRouter.of(context);
             if (!widget.embedded) Navigator.pop(context);
             router.go('/chat');
@@ -841,6 +847,9 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
       ),
       onTap: () {
         // 1) 切换到该历史会话；2) 关抽屉；3) 路由回 /chat 让对话屏展示历史占位。
+        // 关抽屉前先释放搜索框焦点，避免键盘被聊天输入框继承自动弹出
+        _searchFocusNode.unfocus();
+        FocusScope.of(context).unfocus();
         ref.read(chatControllerProvider.notifier).openSession(session.sessionId);
         if (!widget.embedded) Navigator.pop(context);
         GoRouter.of(context).go('/chat');

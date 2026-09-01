@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
+import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import 'quick_entry.dart';
 
@@ -47,6 +49,12 @@ class _ChatInputBarState extends State<ChatInputBar>
     with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
 
+  /// 语音识别（仅移动端初始化；桌面端保持 null，麦克风按钮走 widget.onVoice 兜底）
+  stt.SpeechToText? _speech;
+  bool _speechAvailable = false;
+  bool _listening = false;
+  stt.LocaleName? _zhLocale;
+
   /// ＋ 加号是否展开。
   bool _expanded = false;
 
@@ -59,13 +67,93 @@ class _ChatInputBarState extends State<ChatInputBar>
       vsync: this,
       duration: const Duration(milliseconds: 280),
     );
+    // 仅在移动端初始化语音识别（Windows 桌面不触碰，避免原生能力缺失导致问题）
+    if (!isDesktop(context)) _initSpeech();
+  }
+
+  /// 初始化语音识别能力并优选中文 locale。失败（设备不支持）则保持不可用。
+  Future<void> _initSpeech() async {
+    try {
+      final s = stt.SpeechToText();
+      final ok = await s.initialize(
+        onError: (_) {
+          if (mounted) setState(() => _listening = false);
+        },
+      );
+      if (!mounted) return;
+      if (ok) {
+        try {
+          final locales = await s.locales();
+          final zh = locales
+              .where((l) => l.localeId.toLowerCase().contains('zh'))
+              .toList();
+          _zhLocale = zh.isNotEmpty
+              ? zh.first
+              : (locales.isNotEmpty ? locales.first : null);
+        } catch (_) {
+          // locale 查询失败不影响基础识别
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _speech = s;
+          _speechAvailable = ok;
+        });
+      }
+    } catch (_) {
+      // 不支持则保持 _speech=null / _speechAvailable=false
+    }
   }
 
   @override
   void dispose() {
+    _speech?.cancel();
     _controller.dispose();
     _expandController.dispose();
     super.dispose();
+  }
+
+  void _tip(String message) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
+
+  /// 麦克风按钮：移动端走语音识别，桌面端走 widget.onVoice 兜底提示。
+  Future<void> _toggleVoice() async {
+    if (isDesktop(context)) {
+      widget.onVoice?.call();
+      return;
+    }
+    if (_speech == null || !_speechAvailable) {
+      _tip('当前设备暂不支持语音识别');
+      return;
+    }
+    if (_listening) {
+      await _speech!.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    // 开始聆听：收起键盘，避免与语音输入冲突
+    FocusScope.of(context).unfocus();
+    if (mounted) setState(() => _listening = true);
+    try {
+      await _speech!.listen(
+        onResult: (stt.SpeechRecognitionResult result) {
+          if (!mounted) return;
+          final text = result.recognizedWords;
+          _controller.text = text;
+          _controller.selection =
+              TextSelection.fromPosition(TextPosition(offset: text.length));
+          if (result.finalResult) {
+            setState(() => _listening = false);
+          }
+        },
+        localeId: _zhLocale?.localeId,
+        partialResults: true,
+        listenMode: stt.ListenMode.confirmation,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _listening = false);
+    }
   }
 
   void _toggleExpanded() {
@@ -139,7 +227,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                       onTap: _collapseExpanded,
                       style: const TextStyle(fontSize: 16, height: 1.4),
                       decoration: InputDecoration(
-                        hintText: '发消息或按住说话',
+                        hintText: _listening ? '聆听中…请说话' : '发消息或按住说话',
                         hintStyle: TextStyle(
                           fontSize: 16,
                           color: scheme.onSurfaceVariant,
@@ -176,9 +264,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                         ),
                         const SizedBox(width: 4),
                         _IconBtn(
-                          icon: Icon(Icons.mic_none_outlined,
-                              size: 24, color: scheme.onSurface),
-                          onTap: widget.onVoice ?? () {},
+                          icon: Icon(
+                            _listening ? Icons.mic : Icons.mic_none_outlined,
+                            size: 24,
+                            color: _listening ? Colors.red : scheme.onSurface,
+                          ),
+                          onTap: _toggleVoice,
                         ),
                         // 流式中：最右侧**额外**追加「停止输出」按钮（不替换 ＋）。
                         // 输出结束 (widget.streaming=false) 后自动消失。

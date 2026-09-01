@@ -55,6 +55,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final modelId = ref.read(modelControllerProvider).selectedId;
       ref.read(chatControllerProvider.notifier).setModel(modelId);
     });
+    // 兜底：进入页面首帧清掉可能从抽屉搜索框继承来的焦点，
+    // 避免键盘在用户尚未点击输入框时自动弹出（仅首帧执行一次）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) FocusScope.of(context).unfocus();
+    });
   }
 
   @override

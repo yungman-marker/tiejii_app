@@ -39,6 +39,8 @@ dependencies:
   image_picker: ^1.1.2
   # 移动端原生能力：任意文件选择（附件上传）
   file_picker: ^8.0.0
+  # 移动端原生能力：语音输入（speech_to_text，iOS/Android 系统语音识别，中文 zh-CN）
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

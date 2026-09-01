@@ -41,6 +41,8 @@ dependencies:
   file_picker: ^8.0.0
   # 移动端原生能力：语音输入（speech_to_text，iOS/Android 系统语音识别，中文 zh-CN）
   speech_to_text: ^7.4.0
+  # 移动端原生能力：读取/请求系统权限状态（隐私与权限页），并跳系统设置
+  permission_handler: ^13.0.1
 
 dev_dependencies:
   flutter_test:

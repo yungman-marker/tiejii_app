@@ -1,14 +1,22 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 
 /// 隐私与权限（/me/privacy）。
 /// 顶部：长期记忆设置入口（点击进入记忆设置页）
-/// 中部：系统权限列表（麦克风 / 相机 / 相册 / 位置）
-/// 底部：前往系统权限管理（系统级入口，本端仅占位提示）
-class PrivacyScreen extends StatelessWidget {
+/// 中部：系统权限列表（麦克风 / 相机 / 相册）——**真实读系统授权状态、点行可请求或跳设置**
+/// 底部：前往系统权限管理（跳转到手机系统的 App 设置页）
+///
+/// 实现说明：
+/// - 移动端（android / iOS）用 [permission_handler] 读真实状态；点行：未授权→`request()`
+///   弹系统框，授权后再弹窗；已拒绝→iOS 不会二次弹窗，直接 `openAppSettings()` 跳系统设置。
+/// - 桌面端（Windows 等 permission_handler 不支持的平台）不调用原生 API，状态显示
+///   "由系统提供"，点行仅提示，避免 MissingPluginException / 崩溃。
+class PrivacyScreen extends StatefulWidget {
   const PrivacyScreen({super.key, this.onMemoryTap});
 
   /// 覆盖「长期记忆设置」入口的点击行为。
@@ -21,13 +29,94 @@ class PrivacyScreen extends StatelessWidget {
   /// 「先关弹层再 push 路由」的回调。
   final VoidCallback? onMemoryTap;
 
-  /// 模拟系统权限状态（与设计稿一致）。如接入原生权限 SDK 替换此处即可。
-  static const Map<String, _Perm> _permissions = {
-    '麦克风': _Perm(icon: Icons.mic_none_outlined, status: '未请求'),
-    '相机': _Perm(icon: Icons.camera_alt_outlined, status: '已开启'),
-    '相册': _Perm(icon: Icons.photo_outlined, status: '已开启'),
-    '位置': _Perm(icon: Icons.location_on_outlined, status: '已开启'),
+  @override
+  State<PrivacyScreen> createState() => _PrivacyScreenState();
+}
+
+/// 权限行：图标 + 对应系统权限。
+class _Row {
+  const _Row(this.icon, this.permission);
+  final IconData icon;
+  final Permission permission;
+}
+
+class _PrivacyScreenState extends State<PrivacyScreen> {
+  /// 仅保留 App 真正使用到的权限：麦克风 / 相机 / 相册。
+  /// 「位置」App 未使用，按隐私设计不向用户索取，故不列出。
+  static const Map<String, _Row> _rows = {
+    '麦克风': _Row(Icons.mic_none_outlined, Permission.microphone),
+    '相机': _Row(Icons.camera_alt_outlined, Permission.camera),
+    '相册': _Row(Icons.photo_outlined, Permission.photos),
   };
+
+  final Map<String, PermissionStatus> _statuses = {};
+  bool _isMobile = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _isMobile = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.android ||
+            defaultTargetPlatform == TargetPlatform.iOS);
+    if (_isMobile) {
+      _loadStatuses();
+    } else {
+      _loading = false;
+    }
+  }
+
+  Future<void> _loadStatuses() async {
+    final m = <String, PermissionStatus>{};
+    for (final e in _rows.entries) {
+      try {
+        m[e.key] = await e.value.permission.status;
+      } catch (_) {
+        // 个别权限在特殊机型上读取异常，按「未开启」处理，不影响其它行。
+        m[e.key] = PermissionStatus.denied;
+      }
+    }
+    if (mounted) setState(() {
+      _statuses.addAll(m);
+      _loading = false;
+    });
+  }
+
+  Future<void> _onRowTap(String name) async {
+    if (!_isMobile) {
+      _tip('请在手机端管理权限');
+      return;
+    }
+    final perm = _rows[name]!.permission;
+    final current = _statuses[name] ?? await perm.status;
+    if (current == PermissionStatus.granted) {
+      _tip('$name 已授权');
+      return;
+    }
+    // 未授权先尝试弹系统请求框；若用户拒绝，iOS 不会二次弹窗，跳系统设置授权。
+    final result = await perm.request();
+    if (mounted) setState(() => _statuses[name] = result);
+    if (result != PermissionStatus.granted) {
+      await openAppSettings();
+    }
+  }
+
+  Future<void> _onSystemSettingsTap() async {
+    if (!_isMobile) {
+      _tip('请在手机端管理权限');
+      return;
+    }
+    await openAppSettings();
+  }
+
+  void _tip(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  PermissionStatus? _statusOf(String name) => _statuses[name];
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +144,7 @@ class PrivacyScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 30),
               children: [
                 _MemoryEntryCard(
-                  onTap: onMemoryTap ?? () => context.push('/me/memory'),
+                  onTap: widget.onMemoryTap ?? () => context.push('/me/memory'),
                 ),
                 const SizedBox(height: 18),
                 Padding(
@@ -68,35 +157,22 @@ class PrivacyScreen extends StatelessWidget {
                         height: 1.5),
                   ),
                 ),
-                const _PermissionsCard(permissions: _permissions),
+                _PermissionsCard(
+                  rows: _rows,
+                  isMobile: _isMobile,
+                  loading: _loading,
+                  statusOf: _statusOf,
+                  onTap: _onRowTap,
+                ),
                 const SizedBox(height: 24),
                 Center(
-                  child: _SystemPermissionButton(
-                    onTap: () => ScaffoldMessenger.of(context)
-                      ..hideCurrentSnackBar()
-                      ..showSnackBar(SnackBar(
-                        content: Text(
-                          '系统权限管理：由手机系统提供',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.onPrimary),
-                        ),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.primary,
-                        behavior: SnackBarBehavior.floating,
-                      )),
-                  ),
+                  child: _SystemPermissionButton(onTap: _onSystemSettingsTap),
                 ),
               ],
             ),
           ),
         ],
       );
-}
-
-class _Perm {
-  const _Perm({required this.icon, required this.status});
-  final IconData icon;
-  final String status;
 }
 
 class _MemoryEntryCard extends StatelessWidget {
@@ -164,13 +240,23 @@ class _MemoryEntryCard extends StatelessWidget {
 }
 
 class _PermissionsCard extends StatelessWidget {
-  const _PermissionsCard({required this.permissions});
-  final Map<String, _Perm> permissions;
+  const _PermissionsCard({
+    required this.rows,
+    required this.isMobile,
+    required this.loading,
+    required this.statusOf,
+    required this.onTap,
+  });
+  final Map<String, _Row> rows;
+  final bool isMobile;
+  final bool loading;
+  final PermissionStatus? Function(String name) statusOf;
+  final void Function(String name) onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final entries = permissions.entries.toList();
+    final entries = rows.entries.toList();
     return Container(
       decoration: BoxDecoration(
         color: scheme.surface,
@@ -180,35 +266,55 @@ class _PermissionsCard extends StatelessWidget {
       child: Column(
         children: List.generate(entries.length, (i) {
           final name = entries[i].key;
-          final p = entries[i].value;
+          final row = entries[i].value;
           final isLast = i == entries.length - 1;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              border: isLast
-                  ? null
-                  : Border(
-                      bottom: BorderSide(
-                          color: scheme.outlineVariant, width: 0.5)),
-            ),
-            child: Row(
-              children: [
-                Icon(p.icon, size: 20, color: scheme.onSurfaceVariant),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(name,
-                      style: TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.onSurface)),
+
+          final st = statusOf(name);
+          final granted = isMobile && st == PermissionStatus.granted;
+          final statusText = !isMobile
+              ? '由系统提供'
+              : loading
+                  ? '读取中'
+                  : granted
+                      ? '已开启'
+                      : '未开启';
+          final statusColor = !isMobile || !granted
+              ? scheme.onSurfaceVariant
+              : Colors.green;
+
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onTap(name),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  border: isLast
+                      ? null
+                      : Border(
+                          bottom: BorderSide(
+                              color: scheme.outlineVariant, width: 0.5),
+                        ),
                 ),
-                Text(p.status,
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-                const SizedBox(width: 4),
-                Icon(Icons.chevron_right,
-                    size: 16, color: scheme.onSurfaceVariant),
-              ],
+                child: Row(
+                  children: [
+                    Icon(row.icon, size: 20, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(name,
+                          style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface)),
+                    ),
+                    Text(statusText,
+                        style: TextStyle(fontSize: 12, color: statusColor)),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right,
+                        size: 16, color: scheme.onSurfaceVariant),
+                  ],
+                ),
+              ),
             ),
           );
         }),

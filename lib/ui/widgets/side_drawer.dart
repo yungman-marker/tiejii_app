@@ -365,6 +365,8 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
 
   /// 抽屉头部：左侧品牌 logo + 右侧搜索图标按钮（DeepSeek 风格）。
   ///
+  /// 品牌 logo 用 `assets/安装包logo.png`（铁骥品牌：方形蓝马+红"铁骥"中文），
+  /// 32×32 显示在 header 26px 行高里，BoxFit.contain 自适应不裁切。
   /// 不是胶囊搜索框而是 36×36 圆形浅灰底图标按钮：点击后关抽屉并
   /// `push SessionSearchScreen`（全屏搜索页）。
   /// 整 header 行高 44，便于与下面的"新建对话"主按钮视觉上拉开。
@@ -375,9 +377,10 @@ class _SideDrawerState extends ConsumerState<SideDrawer>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            height: 26,
+            height: 32,
+            width: 32,
             child: Image.asset(
-              'assets/title.png',
+              'assets/安装包logo.png',
               fit: BoxFit.contain,
               alignment: Alignment.centerLeft,
             ),

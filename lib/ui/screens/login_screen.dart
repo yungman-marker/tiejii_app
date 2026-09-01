@@ -134,11 +134,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 顶部品牌 logo（铁骥大模型横长标）
+        // 顶部品牌 logo（铁骥品牌：蓝马+红"铁骥"中文，用安装包logo.png）
         Center(
           child: Image.asset(
-            'assets/title.png',
-            width: 280,
+            'assets/安装包logo.png',
+            width: 120,
             fit: BoxFit.contain,
           ),
         ),

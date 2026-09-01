@@ -55,9 +55,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
-    - assets/title.png
+    - assets/title.png                  # 历史横长品牌标（保留备份，新位置已切到安装包logo）
     - assets/login_bg.png
     - assets/login_mobile_top.png  # 移动端登录页顶部图（仅 _buildMobile 使用，桌面端不变）
+    - assets/安装包logo.png  # 铁骥品牌标识：抽屉头部 + 登录页顶部统一使用（蓝马+红"铁骥"中文）
 
 msix_config:
   display_name: 铁骥大模型

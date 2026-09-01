@@ -32,6 +32,13 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# Read all C/C++ sources as UTF-8. The project's C++ files contain Chinese
+# characters (e.g. the window title L"..." in main.cpp). Without this, MSVC
+# (cl.exe) reads sources under the system code page (936/GBK) and mis-parses
+# the UTF-8 Chinese bytes -> C4819/C2001 compile errors. This pairs with the
+# `#pragma code_page(65001)` already present in runner.rc for the resource file.
+add_compile_options(/utf-8)
+
 # MSVC 2026 (14.51) upgraded the deprecation of <experimental/coroutine> from a
 # warning to a hard error (STL1011). Several Windows plugins (e.g.
 # permission_handler_windows) still rely on <experimental/coroutine> via the

@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/responsive.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
+import '../../providers/theme_provider.dart';
 
 /// 个人中心菜单（分组：账户 / 应用 / 关于 / 隐私与反馈），被全屏页 [MeScreen] 复用。
 ///
@@ -29,11 +31,11 @@ Widget buildMeMenu(BuildContext context, WidgetRef ref) {
       _sectionHeader('应用'),
       _group([
         _row(Icons.translate_outlined, '语言',
-            trailing: '简体中文',
-            onTap: () => _tip(context, '语言设置由手机系统提供')),
+            trailing: _localeLabel(ref.watch(localeProvider)),
+            onTap: () => context.push('/me/language')),
         _row(Icons.palette_outlined, '外观',
-            trailing: '系统',
-            onTap: () => _tip(context, '外观设置由手机系统提供')),
+            trailing: _themeModeLabel(ref.watch(themeModeProvider)),
+            onTap: () => context.push('/me/appearance')),
       ]),
 
       // ── 关于 ──────────────────────────────────────────
@@ -202,6 +204,21 @@ Widget _sectionHeader(String text) => Builder(builder: (ctx) {
 
 void _tip(BuildContext ctx, String message) =>
     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(message)));
+
+/// 语言菜单右侧文字：跟随系统 / 简体中文 / English。
+String _localeLabel(Locale? locale) {
+  if (locale == null) return '跟随系统';
+  if (locale.languageCode == 'zh') return '简体中文';
+  if (locale.languageCode == 'en') return 'English';
+  return '跟随系统';
+}
+
+/// 外观菜单右侧文字：系统 / 浅色 / 深色。
+String _themeModeLabel(ThemeMode mode) => switch (mode) {
+      ThemeMode.light => '浅色',
+      ThemeMode.dark => '深色',
+      ThemeMode.system => '系统',
+    };
 
 void _confirmLogout(BuildContext ctx, WidgetRef ref) {
   showDialog(

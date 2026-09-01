@@ -71,6 +71,7 @@ class MeShellDesktop extends ConsumerWidget {
     if (path.startsWith('/me/feedback')) return 'feedback';
     if (path.startsWith('/me/memory')) return 'memory';
     if (path.startsWith('/me/appearance')) return 'appearance';
+    if (path.startsWith('/me/language')) return 'language';
     return '';
   }
 }
@@ -114,6 +115,13 @@ class _Sidebar extends ConsumerWidget {
             label: '外观主题',
             section: 'appearance',
             onTap: () => context.go('/me/appearance'),
+          ),
+          _item(
+            context,
+            icon: Icons.translate_outlined,
+            label: '语言',
+            section: 'language',
+            onTap: () => context.go('/me/language'),
           ),
           _sectionHeader('关于'),
           _item(

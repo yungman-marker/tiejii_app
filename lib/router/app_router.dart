@@ -15,6 +15,7 @@ import '../ui/screens/knowledge_screen.dart';
 import '../ui/screens/knowledge_dir_screen.dart';
 import '../ui/screens/file_preview_screen.dart';
 import '../ui/screens/appearance_screen.dart';
+import '../ui/screens/language_screen.dart';
 import '../ui/screens/login_screen.dart';
 import '../ui/screens/main_shell.dart';
 import '../ui/screens/memory_screen.dart';
@@ -128,6 +129,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) => isDesktop(context)
                 ? const NoTransitionPage(child: AppearanceScreen())
                 : _slidePage(const AppearanceScreen()),
+          ),
+          GoRoute(
+            path: '/me/language',
+            pageBuilder: (context, state) => isDesktop(context)
+                ? const NoTransitionPage(child: LanguageScreen())
+                : _slidePage(const LanguageScreen()),
           ),
           GoRoute(
             path: '/me/feedback',

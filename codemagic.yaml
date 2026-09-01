@@ -41,12 +41,15 @@ workflows:
         script: cd ios && pod install
       - name: 构建未签名 IPA（--no-codesign，云端不签名）
         script: |
+          set -e
           flutter build ios --release --no-codesign
           cd build/ios/iphoneos
+          mkdir -p "$CM_BUILD_DIR/build/ios/ipa"
           mkdir -p Payload
           cp -r Runner.app Payload/
           zip -r "$CM_BUILD_DIR/build/ios/ipa/tiejii_unsigned.ipa" Payload
           rm -rf Payload
+          ls -la "$CM_BUILD_DIR/build/ios/ipa/"
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:

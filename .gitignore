@@ -56,3 +56,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Windows 安装包构建产物（含 14MB 的 .msix 二进制，不入库；源文件见根目录 install.cmd）
+/dist/
